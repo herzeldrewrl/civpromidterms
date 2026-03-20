@@ -422,6 +422,35 @@
     color: var(--accent);
   }
   .quiz-score p { color: var(--muted); margin-top: 0.5rem; }
+  .btn-check-item {
+    margin-top: 0.9rem;
+    padding: 0.4rem 1.1rem;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 5px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: opacity 0.15s;
+  }
+  .btn-check-item:hover { opacity: 0.78; }
+  .btn-check-item:disabled { opacity: 0.35; cursor: default; }
+  .item-result-badge {
+    display: inline-block;
+    margin-left: 0.6rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 4px;
+    vertical-align: middle;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .item-result-badge.correct { background: var(--green-light); color: var(--green); border: 1px solid var(--green); }
+  .item-result-badge.wrong   { background: var(--red-light);   color: var(--accent); border: 1px solid var(--accent); }
+  .item-result-badge.skipped { background: var(--highlight);   color: var(--gold);   border: 1px solid var(--gold); }
 
   /* ── CASE NOTES ── */
   .case-card {
@@ -625,6 +654,18 @@
   <div id="quiz-topic-filter" style="margin-bottom:1.25rem;">
     <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:0.6rem;">📂 Filter by topic</div>
     <div style="display:flex;flex-wrap:wrap;gap:0.4rem;" id="topic-btn-row"></div>
+  </div>
+
+  <!-- TF topic filter — shown only for True/False -->
+  <div id="tf-topic-filter" style="margin-bottom:1.25rem;display:none;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--gold);margin-bottom:0.6rem;">📂 Filter by topic</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;" id="tf-topic-btn-row"></div>
+  </div>
+
+  <!-- Essay topic filter — shown only for Essay/Enumeration -->
+  <div id="essay-topic-filter" style="margin-bottom:1.25rem;display:none;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;color:#7d3cac;margin-bottom:0.6rem;">📂 Filter by topic</div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem;" id="essay-topic-btn-row"></div>
   </div>
 
   <div id="quiz-container"></div>
@@ -967,6 +1008,110 @@ const topicMeta = {
   trial:                { label: `Trial`, color: `#515a5a` },
 };
 
+const tfTopicMeta = {
+  all:           { label: `All Topics`,           color: `var(--ink)` },
+  general:       { label: `General Principles`,   color: `#515a5a` },
+  jurisdiction:  { label: `Jurisdiction`,         color: `#7b2d8b` },
+  pleadings:     { label: `Pleadings & Motions`,  color: `#c0392b` },
+  summons:       { label: `Summons`,              color: `#1a5c2a` },
+  venue:         { label: `Venue`,                color: `#854f0b` },
+  parties:       { label: `Parties`,              color: `#2471a3` },
+  default:       { label: `Default`,              color: `#c0392b` },
+  dismissal:     { label: `Dismissal`,            color: `#e67e22` },
+  pretrial:      { label: `Pre-Trial`,            color: `#1a5c2a` },
+  demurrer:      { label: `Demurrer`,             color: `#534ab7` },
+  discovery:     { label: `Discovery`,            color: `#117a65` },
+  intervention:  { label: `Intervention`,         color: `#117a65` },
+  appeals:       { label: `Appeals`,              color: `#1a5276` },
+  judgments:     { label: `Judgments`,            color: `#6e2f8a` },
+  execution:     { label: `Execution`,            color: `#784212` },
+  remedies:      { label: `Post-Judgment Remedies`, color: `#0e6655` },
+};
+
+let currentTFTopic = `all`;
+
+function buildTFTopicButtons() {
+  const row = document.getElementById(`tf-topic-btn-row`);
+  if (!row) return;
+  const used = new Set([`all`]);
+  tfData.forEach(q => { if (q.topic) used.add(q.topic); });
+  row.innerHTML = ``;
+  Object.keys(tfTopicMeta).forEach(key => {
+    if (!used.has(key)) return;
+    const meta = tfTopicMeta[key];
+    const count = key === `all` ? tfData.length : tfData.filter(q => q.topic === key).length;
+    const isActive = key === currentTFTopic;
+    const btn = document.createElement(`button`);
+    btn.id = `tfbtn-` + key;
+    btn.style.cssText = `padding:0.3rem 0.75rem;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;cursor:pointer;border:1.5px solid ${meta.color};background:${isActive ? meta.color : `white`};color:${isActive ? `white` : meta.color};transition:all 0.15s;`;
+    btn.textContent = meta.label + ` (${count})`;
+    btn.onclick = () => selectTFTopic(key);
+    row.appendChild(btn);
+  });
+}
+
+function selectTFTopic(topic) {
+  currentTFTopic = topic;
+  buildTFTopicButtons();
+  document.getElementById(`quiz-score`).style.display = `none`;
+  document.getElementById(`quiz-actions`).style.display = `flex`;
+  buildQuiz();
+}
+
+function getFilteredTF() {
+  if (currentTFTopic === `all`) return tfData;
+  return tfData.filter(q => q.topic === currentTFTopic);
+}
+
+const essayTopicMeta = {
+  all:                  { label: `All Topics`,           color: `var(--ink)` },
+  jurisdiction:         { label: `Jurisdiction`,         color: `#7b2d8b` },
+  pleadings:            { label: `Pleadings & Motions`,  color: `#c0392b` },
+  summons:              { label: `Summons`,              color: `#1a5c2a` },
+  'forum-shopping':     { label: `Forum Shopping`,       color: `#922b21` },
+  default:              { label: `Default`,              color: `#c0392b` },
+  dismissal:            { label: `Dismissal`,            color: `#e67e22` },
+  discovery:            { label: `Discovery`,            color: `#117a65` },
+  appeals:              { label: `Appeals`,              color: `#1a5276` },
+  execution:            { label: `Execution`,            color: `#784212` },
+  'provisional-remedies': { label: `Provisional Remedies`, color: `#0e6655` },
+  judgments:            { label: `Judgments`,            color: `#6e2f8a` },
+};
+
+let currentEssayTopic = `all`;
+
+function buildEssayTopicButtons() {
+  const row = document.getElementById(`essay-topic-btn-row`);
+  if (!row) return;
+  const used = new Set([`all`]);
+  essayData.forEach(q => { if (q.topic) used.add(q.topic); });
+  row.innerHTML = ``;
+  Object.keys(essayTopicMeta).forEach(key => {
+    if (!used.has(key)) return;
+    const meta = essayTopicMeta[key];
+    const count = key === `all` ? essayData.length : essayData.filter(q => q.topic === key).length;
+    const isActive = key === currentEssayTopic;
+    const btn = document.createElement(`button`);
+    btn.style.cssText = `padding:0.3rem 0.75rem;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;cursor:pointer;border:1.5px solid ${meta.color};background:${isActive ? meta.color : `white`};color:${isActive ? `white` : meta.color};transition:all 0.15s;`;
+    btn.textContent = meta.label + ` (${count})`;
+    btn.onclick = () => selectEssayTopic(key);
+    row.appendChild(btn);
+  });
+}
+
+function selectEssayTopic(topic) {
+  currentEssayTopic = topic;
+  buildEssayTopicButtons();
+  document.getElementById(`quiz-score`).style.display = `none`;
+  document.getElementById(`quiz-actions`).style.display = `flex`;
+  buildQuiz();
+}
+
+function getFilteredEssay() {
+  if (currentEssayTopic === `all`) return essayData;
+  return essayData.filter(q => q.topic === currentEssayTopic);
+}
+
 function buildTopicButtons() {
   const row = document.getElementById(`topic-btn-row`);
   if (!row) return;
@@ -1008,6 +1153,10 @@ function switchQuizTab(tab) {
   });
   const tf = document.getElementById(`quiz-topic-filter`);
   if (tf) tf.style.display = tab === `mcq` ? `block` : `none`;
+  const tff = document.getElementById(`tf-topic-filter`);
+  if (tff) tff.style.display = tab === `tf` ? `block` : `none`;
+  const eff = document.getElementById(`essay-topic-filter`);
+  if (eff) eff.style.display = tab === `essay` ? `block` : `none`;
   document.getElementById(`quiz-score`).style.display = `none`;
   document.getElementById(`quiz-actions`).style.display = `flex`;
   buildQuiz();
@@ -1070,30 +1219,6 @@ const mcqData = [
   { topic:`intervention`, q:`A party to an action seeks to intervene AFTER judgment has been rendered by the trial court but BEFORE the Court of Appeals decides the appeal. The intervenor claims to be an indispensable party. Should the motion be granted?`,
     opts:[`No — intervention may only be filed before judgment by the trial court, no exceptions`,`Yes — as an indispensable party, intervention may be allowed even on appeal`,`No — intervention may only be filed before perfection of appeal`,`Yes — but only if the CA gives leave`],
     ans:1, exp:`General rule: intervention must be filed BEFORE rendition of judgment by the TRIAL COURT. EXCEPTION: With respect to INDISPENSABLE PARTIES, intervention may be allowed even on appeal to ensure complete determination of all issues. (Spouses Crisologo v. JEWM Agro-Industrial Corporation, G.R. 196894, 2014)` },
-  { q:`Summons was left with the receptionist at defendant's office because defendant was in a meeting. Is service valid?`,
-    opts:[`Yes — defendant was in the office and merely unavailable`,`No — substituted service requires 3 failed attempts on 2 different dates first`,`Yes — the office is an alternative place for substituted service`,`No — only specific officers can receive summons`],
-    ans:1, exp:`Substituted service requires at least 3 attempts on at least 2 different dates (Manotoc v. CA). A single attempt and leaving with a receptionist — without documented failed attempts — is invalid substituted service.` },
-  { q:`Plaintiff filed the same case before two different RTCs on the same day. What is the consequence?`,
-    opts:[`Res judicata — second case dismissed`,`Forum shopping — both may be dismissed; plaintiff/counsel cited in contempt`,`Litis pendentia — later-docketed case dismissed`,`Courts must consolidate the cases`],
-    ans:1, exp:`Filing the same case in two courts simultaneously is forum shopping (Rule 7, Sec. 5). All actions may be dismissed, and willful forum shopping = summary dismissal with prejudice + direct contempt + administrative sanctions.` },
-  { q:`Defendant answered: "I deny that I borrowed ₱500,000 from plaintiff on January 1." What is the legal effect?`,
-    opts:[`Specific denial — borrowing is genuinely in issue`,`Negative pregnant — implies borrowing occurred at different amount or date`,`General denial — constitutes admission`,`Improper denial — must be under oath`],
-    ans:1, exp:`This is a negative pregnant. By qualifying the denial with "₱500,000" and "January 1," defendant impliedly admits that some borrowing occurred — just possibly different amount or date. It is treated as an admission of the core fact.` },
-  { q:`After perfection of appeal, plaintiff filed a motion for execution pending appeal in the RTC. May the RTC grant it?`,
-    opts:[`No — RTC loses all jurisdiction once appeal is perfected`,`Yes — under residual jurisdiction, RTC may act on this before records are transmitted`,`Only the CA can grant execution pending appeal`,`Yes but only if plaintiff posts a bond`],
-    ans:1, exp:`Under residual jurisdiction (Rule 41), the trial court retains power to act on certain matters after perfection of appeal and BEFORE transmission of records to the appellate court. This includes granting execution pending appeal. KEY CASE: DBP v. Judge Carpio.` },
-  { q:`Spouses filed an action to annul a real estate mortgage. Defendant bank moved to dismiss, arguing the MTC has jurisdiction because the secured loan is ₱1.5M. Is the motion tenable?`,
-    opts:[`Yes — amount of secured obligation determines jurisdiction`,`No — annulment of mortgage is incapable of pecuniary estimation; RTC has jurisdiction`,`Yes — ₱1.5M is within MTC threshold`,`It depends on which court the plaintiff chose`],
-    ans:1, exp:`Annulment of mortgage is incapable of pecuniary estimation. The primary relief is nullification of the mortgage deed, not recovery of money. The secured loan amount is merely incidental. RTC has exclusive jurisdiction. CASE: First Sarmiento v. PBCom.` },
-  { q:`A corporation received summons, but it was received only by the company driver. Is jurisdiction acquired over the corporation?`,
-    opts:[`Yes — the corporation actually received the summons`,`No — only the 6 specific officers listed in Rule 14, Sec. 12 may receive summons for a corporation`,`Yes — actual notice is sufficient`,`It depends on whether the driver informed the officers`],
-    ans:1, exp:`Under Rule 14, Sec. 12 (2019 Amendments), summons on a domestic corporation must be served on president, managing partner, GM, corporate secretary, treasurer, or in-house counsel. A company driver is not among these. Service is invalid.` },
-  { q:`Which of the following correctly states the rule on joinder of causes of action?`,
-    opts:[`A party may join causes of action only if they arise from the same transaction`,`A party may join as many causes of action as he has against an opposing party, subject to conditions`,`Special civil actions may be joined with ordinary civil actions`,`Joinder of causes of action in different venues is absolutely prohibited`],
-    ans:1, exp:`Rule 2, Sec. 5: A party may assert as many causes of action as he has against an opposing party in one pleading, subject to: (a) rules on joinder of parties; (b) no special civil actions; (c) if different venues/jurisdictions, allowed in RTC if one COA falls there; (d) totality rule for money claims.` },
-  { q:`Pedro, a Filipino residing in Manila, sued Juan, a non-resident alien not found in the Philippines, for recovery of a parcel of land located in Cebu. Where should the action be filed?`,
-    opts:[`Manila — Pedro's residence`,`Cebu — where the land is located`,`Either Manila or Cebu, at Pedro's election`,`The Philippines has no jurisdiction over non-resident aliens`],
-    ans:1, exp:`This is a REAL ACTION (recovery of real property). Under Rule 4, Sec. 1, real actions must be filed where the property or a portion thereof is located — Cebu. The residence of the parties is irrelevant for real actions.` },
   // MCQs — Judgments, Appeals, Execution, Provisional Remedies
   { topic:`appeals`, q:`The RTC rendered judgment on October 1. Plaintiff received the decision on October 5. On October 20, plaintiff filed a Motion for Reconsideration. The motion was denied and plaintiff received the denial on November 30. On what date must plaintiff file a notice of appeal?`,
     opts:[`November 5 — 30 days from receipt of judgment`,`December 15 — 15 days from receipt of denial of MR (fresh period)`,`December 30 — 60 days from original judgment`,`January 14 — 45 days after denial of MR`],
@@ -1241,60 +1366,230 @@ const mcqData = [
 
 // ── MODIFIED TRUE OR FALSE DATA ──
 const tfData = [
-  { stmt:`Procedural rules are generally prospective in application; they do not apply to pending cases.`, verdict:false, exp:`FALSE. Procedural rules are generally RETROACTIVE — they apply to "further proceedings in cases then pending" because there are no vested rights in rules of procedure. (Rule 144, 2019 Amendments; Sun Insurance v. Asuncion)` },
-  { stmt:`Jurisdiction over the subject matter may be conferred by the express agreement of the parties.`, verdict:false, exp:`FALSE. Jurisdiction over subject matter is conferred EXCLUSIVELY BY LAW. It cannot be conferred by agreement, waiver, or consent of the parties. (Mitsubishi Motors v. Bureau of Customs)` },
-  { stmt:`An action for annulment of a real estate mortgage is an action capable of pecuniary estimation.`, verdict:false, exp:`FALSE. Annulment of mortgage is INCAPABLE of pecuniary estimation because the primary relief is nullification of the mortgage deed, not recovery of money. RTC has jurisdiction. (First Sarmiento v. PBCom)` },
-  { stmt:`Under the 2019 Amendments, the Motion to Dismiss has been completely abolished and all its grounds must now be raised as affirmative defenses in the answer.`, verdict:false, exp:`FALSE. Three grounds survive as permissible MTD grounds: (1) lack of SMJ, (2) litis pendentia, (3) res judicata/prescription. These may be raised as MTD OR as affirmative defenses. Rule 16 was deleted but these 3 grounds were transposed to Rule 15, Sec. 12.` },
-  { stmt:`A compulsory counterclaim not raised in the answer is barred and cannot be pursued in a separate action.`, verdict:true, exp:`TRUE. Under Rule 9, Sec. 2: "A compulsory counterclaim or cross-claim not set up shall be barred." The purpose is to prevent multiplicity of suits by requiring all related claims to be litigated in one action.` },
-  { stmt:`Failure to verify a pleading renders it void and without legal effect.`, verdict:false, exp:`FALSE. A defective or missing verification is a FORMAL defect, not a jurisdictional one. It is curable by amendment. It does NOT render the pleading void — it renders it as an unsigned pleading (which can be remedied). (Vda. de Formoso v. PNB)` },
-  { stmt:`A negative pregnant is a form of specific denial that is actually treated as an admission.`, verdict:true, exp:`TRUE. A negative pregnant is a denial that implies an admission of the main allegation by denying only an incidental matter. Courts treat it as an admission of the ultimate fact alleged.` },
-  { stmt:`In actions for annulment of marriage, the court may declare the defendant in default if no answer is filed.`, verdict:false, exp:`FALSE. Under Rule 9, Sec. 3(e), default is NOT ALLOWED in actions for annulment or declaration of nullity of marriage or legal separation. The Solicitor General or deputized prosecutor must instead investigate for collusion and intervene for the State.` },
-  { stmt:`Substituted service of summons is proper whenever personal service has failed once.`, verdict:false, exp:`FALSE. Substituted service requires at least THREE (3) ATTEMPTS on at least TWO (2) DIFFERENT DATES before it may be resorted to. The sheriff's return must also explain the impossibility of personal service. (Rule 14, Sec. 6; Manotoc v. CA)` },
-  { stmt:`Under Rule 18, Judicial Dispute Resolution (JDR) is still mandatory in all civil cases after pre-trial.`, verdict:false, exp:`FALSE. Under the 2019 Amendments (Rule 18, Secs. 9-10), JDR is NO LONGER MANDATORY. It may be conducted only if the judge is convinced settlement is still possible after failed Court-Annexed Mediation (CAM). CAM remains mandatory.` },
-  { stmt:`A real party in interest and an indispensable party are the same concept.`, verdict:false, exp:`FALSE. A REAL PARTY IN INTEREST is the party who stands to be benefited or injured by the judgment (Rule 3, Sec. 2) — concerns capacity to sue. An INDISPENSABLE PARTY is one whose absence prevents a final determination (Rule 3, Sec. 7) — concerns necessary presence. A party may be a real party in interest without being indispensable, and vice versa.` },
-  { stmt:`A reply is now required in all civil cases under the 2019 Amendments to allow the plaintiff to deny new matters raised in the answer.`, verdict:false, exp:`FALSE. Under Rule 6, Sec. 10 (2019 Amendments), all new matters in the answer are DEEMED CONTROVERTED — no reply is necessary. A reply is permitted ONLY IF the defending party attaches an actionable document to the answer.` },
-  { stmt:`The doctrine of judicial hierarchy prevents all direct filings with the Supreme Court.`, verdict:false, exp:`FALSE. The doctrine requires filing before the lowest court with competent jurisdiction as a GENERAL RULE. Direct filing with the SC is ALLOWED for compelling reasons: transcendental importance, urgency, pattern or practice, or other exceptional circumstances. (Gios-Samar v. DOTC)` },
-  { stmt:`The filing of a third-party complaint always requires leave of court under the 2019 Amendments.`, verdict:true, exp:`TRUE. Under Rule 6, Sec. 11 (2019 Amendments), a third-party complaint "may, with LEAVE OF COURT, be filed" by a defending party. Leave is required, unlike before. The court shall deny admission if the 3rd party defendant cannot be located within 30 days, or if extraneous matters are raised, or if it would introduce a new controversy.` },
-  { stmt:`Venue may be validly waived by the parties through a written stipulation executed before the filing of the action.`, verdict:true, exp:`TRUE. Under Rule 4, Sec. 4(b), the venue rules do not apply "where the parties have validly agreed in writing before the filing of the action on the exclusive venue thereof." This is a recognized exception to the default venue rules.` },
+  { topic:`general`, stmt:`Procedural rules are generally prospective in application; they do not apply to pending cases.`, verdict:false, exp:`FALSE. Procedural rules are generally RETROACTIVE — they apply to "further proceedings in cases then pending" because there are no vested rights in rules of procedure. (Rule 144, 2019 Amendments; Sun Insurance v. Asuncion)` },
+  { topic:`jurisdiction`, stmt:`Jurisdiction over the subject matter may be conferred by the express agreement of the parties.`, verdict:false, exp:`FALSE. Jurisdiction over subject matter is conferred EXCLUSIVELY BY LAW. It cannot be conferred by agreement, waiver, or consent of the parties. (Mitsubishi Motors v. Bureau of Customs)` },
+  { topic:`jurisdiction`, stmt:`An action for annulment of a real estate mortgage is an action capable of pecuniary estimation.`, verdict:false, exp:`FALSE. Annulment of mortgage is INCAPABLE of pecuniary estimation because the primary relief is nullification of the mortgage deed, not recovery of money. RTC has jurisdiction. (First Sarmiento v. PBCom)` },
+  { topic:`pleadings`, stmt:`Under the 2019 Amendments, the Motion to Dismiss has been completely abolished and all its grounds must now be raised as affirmative defenses in the answer.`, verdict:false, exp:`FALSE. Three grounds survive as permissible MTD grounds: (1) lack of SMJ, (2) litis pendentia, (3) res judicata/prescription. These may be raised as MTD OR as affirmative defenses. Rule 16 was deleted but these 3 grounds were transposed to Rule 15, Sec. 12.` },
+  { topic:`pleadings`, stmt:`A compulsory counterclaim not raised in the answer is barred and cannot be pursued in a separate action.`, verdict:true, exp:`TRUE. Under Rule 9, Sec. 2: "A compulsory counterclaim or cross-claim not set up shall be barred." The purpose is to prevent multiplicity of suits by requiring all related claims to be litigated in one action.` },
+  { topic:`pleadings`, stmt:`Failure to verify a pleading renders it void and without legal effect.`, verdict:false, exp:`FALSE. A defective or missing verification is a FORMAL defect, not a jurisdictional one. It is curable by amendment. It does NOT render the pleading void — it renders it as an unsigned pleading (which can be remedied). (Vda. de Formoso v. PNB)` },
+  { topic:`pleadings`, stmt:`A negative pregnant is a form of specific denial that is actually treated as an admission.`, verdict:true, exp:`TRUE. A negative pregnant is a denial that implies an admission of the main allegation by denying only an incidental matter. Courts treat it as an admission of the ultimate fact alleged.` },
+  { topic:`default`, stmt:`In actions for annulment of marriage, the court may declare the defendant in default if no answer is filed.`, verdict:false, exp:`FALSE. Under Rule 9, Sec. 3(e), default is NOT ALLOWED in actions for annulment or declaration of nullity of marriage or legal separation. The Solicitor General or deputized prosecutor must instead investigate for collusion and intervene for the State.` },
+  { topic:`summons`, stmt:`Substituted service of summons is proper whenever personal service has failed once.`, verdict:false, exp:`FALSE. Substituted service requires at least THREE (3) ATTEMPTS on at least TWO (2) DIFFERENT DATES before it may be resorted to. The sheriff's return must also explain the impossibility of personal service. (Rule 14, Sec. 6; Manotoc v. CA)` },
+  { topic:`pretrial`, stmt:`Under Rule 18, Judicial Dispute Resolution (JDR) is still mandatory in all civil cases after pre-trial.`, verdict:false, exp:`FALSE. Under the 2019 Amendments (Rule 18, Secs. 9-10), JDR is NO LONGER MANDATORY. It may be conducted only if the judge is convinced settlement is still possible after failed Court-Annexed Mediation (CAM). CAM remains mandatory.` },
+  { topic:`parties`, stmt:`A real party in interest and an indispensable party are the same concept.`, verdict:false, exp:`FALSE. A REAL PARTY IN INTEREST is the party who stands to be benefited or injured by the judgment (Rule 3, Sec. 2) — concerns capacity to sue. An INDISPENSABLE PARTY is one whose absence prevents a final determination (Rule 3, Sec. 7) — concerns necessary presence. A party may be a real party in interest without being indispensable, and vice versa.` },
+  { topic:`pleadings`, stmt:`A reply is now required in all civil cases under the 2019 Amendments to allow the plaintiff to deny new matters raised in the answer.`, verdict:false, exp:`FALSE. Under Rule 6, Sec. 10 (2019 Amendments), all new matters in the answer are DEEMED CONTROVERTED — no reply is necessary. A reply is permitted ONLY IF the defending party attaches an actionable document to the answer.` },
+  { topic:`jurisdiction`, stmt:`The doctrine of judicial hierarchy prevents all direct filings with the Supreme Court.`, verdict:false, exp:`FALSE. The doctrine requires filing before the lowest court with competent jurisdiction as a GENERAL RULE. Direct filing with the SC is ALLOWED for compelling reasons: transcendental importance, urgency, pattern or practice, or other exceptional circumstances. (Gios-Samar v. DOTC)` },
+  { topic:`pleadings`, stmt:`The filing of a third-party complaint always requires leave of court under the 2019 Amendments.`, verdict:true, exp:`TRUE. Under Rule 6, Sec. 11 (2019 Amendments), a third-party complaint "may, with LEAVE OF COURT, be filed" by a defending party. Leave is required, unlike before. The court shall deny admission if the 3rd party defendant cannot be located within 30 days, or if extraneous matters are raised, or if it would introduce a new controversy.` },
+  { topic:`venue`, stmt:`Venue may be validly waived by the parties through a written stipulation executed before the filing of the action.`, verdict:true, exp:`TRUE. Under Rule 4, Sec. 4(b), the venue rules do not apply "where the parties have validly agreed in writing before the filing of the action on the exclusive venue thereof." This is a recognized exception to the default venue rules.` },
   // NEW TF FROM BLUE NOTES
-  { stmt:`In civil cases, demurrer to evidence requires leave of court for defendant to file it.`, verdict:false, exp:`FALSE. In CIVIL CASES, NO LEAVE OF COURT is required for defendant to file a demurrer to evidence. The defendant simply files after plaintiff rests. CONTRAST with CRIMINAL CASES, where the accused must get leave of court — if he files without leave and demurrer is denied, he loses the right to present evidence. (Rule 33; Rule 119, Sec. 23)` },
-  { stmt:`The court may on its own motion make a demurrer to evidence in a civil case.`, verdict:false, exp:`FALSE. In civil cases, the court CANNOT motu proprio make a demurrer — only the DEFENDANT can file it. However, in CRIMINAL CASES, the court may demur to the evidence on its own motion under Rule 119, Sec. 23. This is a critical distinction between civil and criminal demurrer.` },
-  { stmt:`An unlicensed foreign corporation doing business in the Philippines cannot sue before Philippine courts.`, verdict:true, exp:`TRUE. An unlicensed foreign corporation DOING BUSINESS in the Philippines CANNOT sue before Philippine courts. HOWEVER, an unlicensed foreign corporation NOT doing business in the Philippines CAN sue before Philippine courts. The doctrine: "doing business" without a license = no right to sue. (Van Zuiden v. GTVL, G.R. No. 147905, 2007)` },
-  { stmt:`In an action for partition, which is an action quasi in rem, extraterritorial service of summons on non-resident defendants is proper.`, verdict:true, exp:`TRUE. Extraterritorial service is allowed when: (1) the defendant is a non-resident who cannot be found in the Philippines, AND (2) the action is IN REM or QUASI IN REM. Partition is a quasi in rem action as it affects specific property. Service by publication + registered mail (or other modes) is valid with leave of court. (Rule 14, Sec. 17; Jose v. Boyon, G.R. 147369, 2003)` },
-  { stmt:`Misjoinder of causes of action is a ground for dismissal of the complaint.`, verdict:false, exp:`FALSE. Under Rule 2, Sec. 6, misjoinder of causes of action is NOT a ground for dismissal. A misjoined cause of action may, on motion of a party or on the initiative of the court, be SEVERED and proceeded with separately. The same rule applies to misjoinder and non-joinder of parties under Rule 3, Sec. 11.` },
-  { stmt:`In a class suit, approval of the court is required before the suit may be dismissed or compromised.`, verdict:true, exp:`TRUE. Rule 3, Sec. 12 provides that a class suit shall NOT be dismissed or compromised without the APPROVAL OF THE COURT. This is to protect the interests of all the members of the class, including those not directly participating in the litigation.` },
-  { stmt:`An amended pleading completely supersedes the original pleading, rendering all admissions in the original pleading inadmissible.`, verdict:false, exp:`FALSE. While an amended pleading SUPERSEDES the original (Rule 10, Sec. 8), ADMISSIONS in the original (superseded) pleading may still be RECEIVED IN EVIDENCE against the pleader, as long as they are formally offered. They are treated as extrajudicial admissions. Claims or defenses NOT incorporated in the amended pleading are deemed WAIVED.` },
+  { topic:`demurrer`, stmt:`In civil cases, demurrer to evidence requires leave of court for defendant to file it.`, verdict:false, exp:`FALSE. In CIVIL CASES, NO LEAVE OF COURT is required for defendant to file a demurrer to evidence. The defendant simply files after plaintiff rests. CONTRAST with CRIMINAL CASES, where the accused must get leave of court — if he files without leave and demurrer is denied, he loses the right to present evidence. (Rule 33; Rule 119, Sec. 23)` },
+  { topic:`demurrer`, stmt:`The court may on its own motion make a demurrer to evidence in a civil case.`, verdict:false, exp:`FALSE. In civil cases, the court CANNOT motu proprio make a demurrer — only the DEFENDANT can file it. However, in CRIMINAL CASES, the court may demur to the evidence on its own motion under Rule 119, Sec. 23. This is a critical distinction between civil and criminal demurrer.` },
+  { topic:`parties`, stmt:`An unlicensed foreign corporation doing business in the Philippines cannot sue before Philippine courts.`, verdict:true, exp:`TRUE. An unlicensed foreign corporation DOING BUSINESS in the Philippines CANNOT sue before Philippine courts. HOWEVER, an unlicensed foreign corporation NOT doing business in the Philippines CAN sue before Philippine courts. The doctrine: "doing business" without a license = no right to sue. (Van Zuiden v. GTVL, G.R. No. 147905, 2007)` },
+  { topic:`summons`, stmt:`In an action for partition, which is an action quasi in rem, extraterritorial service of summons on non-resident defendants is proper.`, verdict:true, exp:`TRUE. Extraterritorial service is allowed when: (1) the defendant is a non-resident who cannot be found in the Philippines, AND (2) the action is IN REM or QUASI IN REM. Partition is a quasi in rem action as it affects specific property. Service by publication + registered mail (or other modes) is valid with leave of court. (Rule 14, Sec. 17; Jose v. Boyon, G.R. 147369, 2003)` },
+  { topic:`pleadings`, stmt:`Misjoinder of causes of action is a ground for dismissal of the complaint.`, verdict:false, exp:`FALSE. Under Rule 2, Sec. 6, misjoinder of causes of action is NOT a ground for dismissal. A misjoined cause of action may, on motion of a party or on the initiative of the court, be SEVERED and proceeded with separately. The same rule applies to misjoinder and non-joinder of parties under Rule 3, Sec. 11.` },
+  { topic:`parties`, stmt:`In a class suit, approval of the court is required before the suit may be dismissed or compromised.`, verdict:true, exp:`TRUE. Rule 3, Sec. 12 provides that a class suit shall NOT be dismissed or compromised without the APPROVAL OF THE COURT. This is to protect the interests of all the members of the class, including those not directly participating in the litigation.` },
+  { topic:`pleadings`, stmt:`An amended pleading completely supersedes the original pleading, rendering all admissions in the original pleading inadmissible.`, verdict:false, exp:`FALSE. While an amended pleading SUPERSEDES the original (Rule 10, Sec. 8), ADMISSIONS in the original (superseded) pleading may still be RECEIVED IN EVIDENCE against the pleader, as long as they are formally offered. They are treated as extrajudicial admissions. Claims or defenses NOT incorporated in the amended pleading are deemed WAIVED.` },
   // NEW TF — Judgments, Appeals, Execution
-  { stmt:`A petition for relief from judgment (Rule 38) may be filed within 6 months from entry of judgment regardless of when the petitioner learned of the judgment.`, verdict:false, exp:`FALSE. Under Rule 38, there are TWO periods that BOTH must be satisfied: (1) within 60 DAYS after petitioner learns of the judgment, AND (2) within 6 MONTHS after entry of judgment. BOTH periods must be complied with. A petition filed more than 60 days after learning of the judgment but within 6 months of entry is still LATE.` },
-  { stmt:`Under Rule 37, a party may file both a Motion for New Trial AND a Motion for Reconsideration of the same judgment.`, verdict:false, exp:`FALSE. Only ONE motion for new trial OR one motion for reconsideration is allowed on the same judgment. Filing a second motion for reconsideration is a PROHIBITED motion under the 2019 Amendments (Rule 15, Sec. 12[c]). A second MR does NOT toll the period to appeal — it is pro forma.` },
-  { stmt:`A writ of execution may be issued as a matter of right even before a judgment becomes final if the prevailing party posts a supersedeas bond.`, verdict:false, exp:`FALSE. It is the LOSING PARTY (not the prevailing party) who posts a supersedeas bond to STAY execution pending appeal. The prevailing party may move for EXECUTION PENDING APPEAL (discretionary) and the court may require the APPLICANT (prevailing party) to post a bond. The bond here is to answer for damages if the appeal succeeds. (Rule 39, Sec. 2)` },
-  { stmt:`Rule 65 certiorari can be used as a substitute for a lost appeal.`, verdict:false, exp:`FALSE. Rule 65 (certiorari) cannot substitute for a lost appeal. The remedy is AVAILABLE only when there is NO APPEAL or any other plain, speedy, and adequate remedy in the ordinary course of law. When appeal is available but lost through negligence or failure to comply with reglementary periods, certiorari will not lie as a substitute. This is settled and consistent Supreme Court doctrine.` },
-  { stmt:`In execution of a money judgment, the sheriff must first levy on personal property before resorting to real property.`, verdict:true, exp:`TRUE. Under Rule 39, Sec. 9, in execution of a money judgment, the officer shall satisfy the judgment by: FIRST, levying on personal property of the judgment obligor not exempt from execution; and if insufficient, THEN by levying on real property. The order is mandatory unless the judgment obligor specifically designates real property first.` },
-  { stmt:`Annulment of judgment under Rule 47 may be based on intrinsic fraud — fraud committed during the trial on the merits.`, verdict:false, exp:`FALSE. Under Rule 47, annulment of judgment may only be based on: (1) LACK OF JURISDICTION, or (2) EXTRINSIC FRAUD. INTRINSIC FRAUD (fraud committed within the trial itself, such as false testimony or perjured evidence) is NOT a ground. Extrinsic fraud is fraud that PREVENTED a party from having a full hearing — it prevented the opposing party from even knowing about or participating in the proceedings.` },
+  { topic:`remedies`, stmt:`A petition for relief from judgment (Rule 38) may be filed within 6 months from entry of judgment regardless of when the petitioner learned of the judgment.`, verdict:false, exp:`FALSE. Under Rule 38, there are TWO periods that BOTH must be satisfied: (1) within 60 DAYS after petitioner learns of the judgment, AND (2) within 6 MONTHS after entry of judgment. BOTH periods must be complied with. A petition filed more than 60 days after learning of the judgment but within 6 months of entry is still LATE.` },
+  { topic:`judgments`, stmt:`Under Rule 37, a party may file both a Motion for New Trial AND a Motion for Reconsideration of the same judgment.`, verdict:false, exp:`FALSE. Only ONE motion for new trial OR one motion for reconsideration is allowed on the same judgment. Filing a second motion for reconsideration is a PROHIBITED motion under the 2019 Amendments (Rule 15, Sec. 12[c]). A second MR does NOT toll the period to appeal — it is pro forma.` },
+  { topic:`execution`, stmt:`A writ of execution may be issued as a matter of right even before a judgment becomes final if the prevailing party posts a supersedeas bond.`, verdict:false, exp:`FALSE. It is the LOSING PARTY (not the prevailing party) who posts a supersedeas bond to STAY execution pending appeal. The prevailing party may move for EXECUTION PENDING APPEAL (discretionary) and the court may require the APPLICANT (prevailing party) to post a bond. The bond here is to answer for damages if the appeal succeeds. (Rule 39, Sec. 2)` },
+  { topic:`appeals`, stmt:`Rule 65 certiorari can be used as a substitute for a lost appeal.`, verdict:false, exp:`FALSE. Rule 65 (certiorari) cannot substitute for a lost appeal. The remedy is AVAILABLE only when there is NO APPEAL or any other plain, speedy, and adequate remedy in the ordinary course of law. When appeal is available but lost through negligence or failure to comply with reglementary periods, certiorari will not lie as a substitute. This is settled and consistent Supreme Court doctrine.` },
+  { topic:`execution`, stmt:`In execution of a money judgment, the sheriff must first levy on personal property before resorting to real property.`, verdict:true, exp:`TRUE. Under Rule 39, Sec. 9, in execution of a money judgment, the officer shall satisfy the judgment by: FIRST, levying on personal property of the judgment obligor not exempt from execution; and if insufficient, THEN by levying on real property. The order is mandatory unless the judgment obligor specifically designates real property first.` },
+  { topic:`remedies`, stmt:`Annulment of judgment under Rule 47 may be based on intrinsic fraud — fraud committed during the trial on the merits.`, verdict:false, exp:`FALSE. Under Rule 47, annulment of judgment may only be based on: (1) LACK OF JURISDICTION, or (2) EXTRINSIC FRAUD. INTRINSIC FRAUD (fraud committed within the trial itself, such as false testimony or perjured evidence) is NOT a ground. Extrinsic fraud is fraud that PREVENTED a party from having a full hearing — it prevented the opposing party from even knowing about or participating in the proceedings.` },
   // ── FINAL T/F BATCH ──
-  { stmt:`Personal service is the preferred mode of service of pleadings and other papers under Rule 13, and non-personal service must be accompanied by a written explanation.`, verdict:true, exp:`TRUE. Under Rule 13, Sec. 6, whenever practicable, service shall be done PERSONALLY. If another mode of service is used, it must be ACCOMPANIED BY A WRITTEN EXPLANATION why personal service was not done. Failure to attach the written explanation may be cause for the paper to be considered NOT filed. (Rule 13, Sec. 6)` },
-  { stmt:`A judgment may be executed by motion within 10 years from its entry.`, verdict:false, exp:`FALSE. Under Rule 39, Sec. 6, a final judgment may be enforced by MOTION within FIVE (5) YEARS from its entry. After 5 years, the judgment becomes dormant and may only be enforced by filing an INDEPENDENT ACTION to revive it — provided the action is brought before the statute of limitations bars it. The 5-year period is counted from ENTRY of judgment, not from finality.` },
-  { stmt:`A supplemental complaint may be answered within 10 days from its admission by the court.`, verdict:false, exp:`FALSE. Under Rule 11, Sec. 7, a supplemental complaint may be answered within TWENTY (20) CALENDAR DAYS from notice of the order admitting the same, unless a different period is fixed by the court. If no new or supplemental answer is filed, the original answer serves as the answer to the supplemental complaint. Note: a supplemental pleading always requires leave of court.` },
-  { stmt:`The omnibus motion rule requires that all grounds available at the time of filing a motion must be included, failing which they are deemed waived.`, verdict:true, exp:`TRUE. Under Rule 15, Sec. 9 (Omnibus Motion Rule): A motion attacking a pleading, order, judgment, or proceeding shall include all objections then available, and all objections not so included shall be deemed WAIVED. EXCEPTIONS not waived by this rule: lack of jurisdiction over the subject matter and failure to state a cause of action (which may be raised even on appeal).` },
-  { stmt:`A petition for certiorari under Rule 65 must be filed within 30 days from notice of the judgment or order being questioned.`, verdict:false, exp:`FALSE. Under Rule 65, Sec. 4 (as amended by A.M. No. 07-7-12-SC), a petition for certiorari must be filed within SIXTY (60) CALENDAR DAYS from notice of the judgment or order, or from denial of the motion for reconsideration. There is NO extension of time to file the petition for certiorari, unlike ordinary appeal. (The old rule allowed 15 days from denial of MR; the current rule gives 60 days from notice of the assailed judgment/order itself or from denial of MR, whichever is later.)` },
-  { stmt:`Barangay conciliation is a condition precedent for ALL types of civil cases regardless of the nature of the parties or the subject matter.`, verdict:false, exp:`FALSE. Barangay conciliation applies as a GENERAL RULE only to disputes between INDIVIDUALS/NATURAL PERSONS. It does NOT apply when: (a) one party is the government or instrumentality; (b) one party is a public officer in relation to official functions; (c) one party is a juridical entity (corporation, partnership, association); (d) parties reside in different cities/municipalities (except adjoining barangays); (e) offense has penalty > 1 year or fine > P5,000; (f) urgent legal action needed. (Katarungang Pambarangay Law; RA 7160)` },
-  { stmt:`Where a motion for reconsideration is denied, the movant is entitled to a fresh 15-day period to appeal regardless of how many days of the original period had already elapsed.`, verdict:true, exp:`TRUE. This is the FRESH PERIOD RULE from Neypes v. CA (G.R. No. 141524, 2005). A party who timely files a Motion for Reconsideration (or MNT) receives a COMPLETELY FRESH 15-DAY PERIOD upon receipt of the order denying the motion — regardless of how many days of the original period remain. This applies to ordinary appeals to the RTC, CA, and SC. The rule was applied retroactively to pending cases.` },
-  { stmt:`In a petition for relief under Rule 38, the petitioner need only show that the judgment was unfair; FAME need not be established.`, verdict:false, exp:`FALSE. Petition for relief requires the petitioner to show that the judgment/order/proceeding was taken against the party through FRAUD, ACCIDENT, MISTAKE, OR EXCUSABLE NEGLIGENCE (FAME). The petition must be VERIFIED and accompanied by an AFFIDAVIT OF MERITS showing the petitioner has a meritorious cause of action or defense. An unfair outcome alone, without showing FAME prevented the party from participating, is insufficient.` },
+  { topic:`pleadings`, stmt:`Personal service is the preferred mode of service of pleadings and other papers under Rule 13, and non-personal service must be accompanied by a written explanation.`, verdict:true, exp:`TRUE. Under Rule 13, Sec. 6, whenever practicable, service shall be done PERSONALLY. If another mode of service is used, it must be ACCOMPANIED BY A WRITTEN EXPLANATION why personal service was not done. Failure to attach the written explanation may be cause for the paper to be considered NOT filed. (Rule 13, Sec. 6)` },
+  { topic:`execution`, stmt:`A judgment may be executed by motion within 10 years from its entry.`, verdict:false, exp:`FALSE. Under Rule 39, Sec. 6, a final judgment may be enforced by MOTION within FIVE (5) YEARS from its entry. After 5 years, the judgment becomes dormant and may only be enforced by filing an INDEPENDENT ACTION to revive it — provided the action is brought before the statute of limitations bars it. The 5-year period is counted from ENTRY of judgment, not from finality.` },
+  { topic:`pleadings`, stmt:`A supplemental complaint may be answered within 10 days from its admission by the court.`, verdict:false, exp:`FALSE. Under Rule 11, Sec. 7, a supplemental complaint may be answered within TWENTY (20) CALENDAR DAYS from notice of the order admitting the same, unless a different period is fixed by the court. If no new or supplemental answer is filed, the original answer serves as the answer to the supplemental complaint. Note: a supplemental pleading always requires leave of court.` },
+  { topic:`pleadings`, stmt:`The omnibus motion rule requires that all grounds available at the time of filing a motion must be included, failing which they are deemed waived.`, verdict:true, exp:`TRUE. Under Rule 15, Sec. 9 (Omnibus Motion Rule): A motion attacking a pleading, order, judgment, or proceeding shall include all objections then available, and all objections not so included shall be deemed WAIVED. EXCEPTIONS not waived by this rule: lack of jurisdiction over the subject matter and failure to state a cause of action (which may be raised even on appeal).` },
+  { topic:`appeals`, stmt:`A petition for certiorari under Rule 65 must be filed within 30 days from notice of the judgment or order being questioned.`, verdict:false, exp:`FALSE. Under Rule 65, Sec. 4 (as amended by A.M. No. 07-7-12-SC), a petition for certiorari must be filed within SIXTY (60) CALENDAR DAYS from notice of the judgment or order, or from denial of the motion for reconsideration. There is NO extension of time to file the petition for certiorari, unlike ordinary appeal. (The old rule allowed 15 days from denial of MR; the current rule gives 60 days from notice of the assailed judgment/order itself or from denial of MR, whichever is later.)` },
+  { topic:`jurisdiction`, stmt:`Barangay conciliation is a condition precedent for ALL types of civil cases regardless of the nature of the parties or the subject matter.`, verdict:false, exp:`FALSE. Barangay conciliation applies as a GENERAL RULE only to disputes between INDIVIDUALS/NATURAL PERSONS. It does NOT apply when: (a) one party is the government or instrumentality; (b) one party is a public officer in relation to official functions; (c) one party is a juridical entity (corporation, partnership, association); (d) parties reside in different cities/municipalities (except adjoining barangays); (e) offense has penalty > 1 year or fine > P5,000; (f) urgent legal action needed. (Katarungang Pambarangay Law; RA 7160)` },
+  { topic:`judgments`, stmt:`Where a motion for reconsideration is denied, the movant is entitled to a fresh 15-day period to appeal regardless of how many days of the original period had already elapsed.`, verdict:true, exp:`TRUE. This is the FRESH PERIOD RULE from Neypes v. CA (G.R. No. 141524, 2005). A party who timely files a Motion for Reconsideration (or MNT) receives a COMPLETELY FRESH 15-DAY PERIOD upon receipt of the order denying the motion — regardless of how many days of the original period remain. This applies to ordinary appeals to the RTC, CA, and SC. The rule was applied retroactively to pending cases.` },
+  { topic:`remedies`, stmt:`In a petition for relief under Rule 38, the petitioner need only show that the judgment was unfair; FAME need not be established.`, verdict:false, exp:`FALSE. Petition for relief requires the petitioner to show that the judgment/order/proceeding was taken against the party through FRAUD, ACCIDENT, MISTAKE, OR EXCUSABLE NEGLIGENCE (FAME). The petition must be VERIFIED and accompanied by an AFFIDAVIT OF MERITS showing the petitioner has a meritorious cause of action or defense. An unfair outcome alone, without showing FAME prevented the party from participating, is insufficient.` },
+
+  // ── JURISDICTION (need +1) ──
+  { topic:`jurisdiction`, stmt:`The assessed value of real property, not the amount of the loan secured by a mortgage, determines jurisdiction in a judicial foreclosure action.`,
+    verdict:true, exp:`TRUE. Judicial foreclosure is a REAL ACTION — it affects title to or possession of real property. For real actions, jurisdiction is determined by the ASSESSED VALUE of the property (not the loan amount). Under RA 11576: if assessed value exceeds ₱400,000 → RTC; if ₱400,000 or below → MTC. Venue is where the property is located. (Roldan v. Sps. Barrios)` },
+
+  { topic:`jurisdiction`, stmt:`A court that has already acquired jurisdiction over a case loses that jurisdiction when the applicable law is subsequently amended to change the jurisdictional threshold.`,
+    verdict:false, exp:`FALSE. This is the DOCTRINE OF ADHERENCE OF JURISDICTION: once jurisdiction attaches upon filing of the complaint (with payment of docket fees), it CANNOT be ousted by subsequent events, including amendments to the law changing jurisdictional amounts. The court retains jurisdiction until final disposition. (Baritua v. Mercader; Rule 144, 2019 Amendments)` },
+
+  // ── GENERAL (+4) ──
+  { topic:`general`, stmt:`Remedial law creates, defines, and regulates substantive rights — it is the same as substantive law in effect.`,
+    verdict:false, exp:`FALSE. SUBSTANTIVE LAW creates, defines, and regulates rights and obligations. REMEDIAL LAW (also called adjective or procedural law) prescribes the METHOD of enforcing those rights or obtaining redress for their violation. They are distinct: substantive law establishes the right; remedial law provides the machinery to enforce it. Remedial laws are generally retroactive; substantive laws are generally prospective. (Bustos v. Lucero)` },
+
+  { topic:`general`, stmt:`Procedural rules enacted by the Supreme Court may not be modified or repealed by Congress.`,
+    verdict:true, exp:`TRUE. Under Art. VIII, Sec. 5(5) of the 1987 Constitution, the Supreme Court has the EXCLUSIVE power to promulgate rules concerning pleading, practice, and procedure. While Congress may pass laws affecting procedure, the SC retains the constitutional authority to MODIFY OR REPEAL such rules. In case of conflict between SC rules and a legislative act on purely procedural matters, SC rules prevail. This is part of the SC's rule-making power.` },
+
+  { topic:`general`, stmt:`The Rules of Court must be strictly construed because they are penal in nature.`,
+    verdict:false, exp:`FALSE. Under Rule 1, Sec. 6: The Rules of Court shall be LIBERALLY CONSTRUED in order to promote their objective of securing a JUST, SPEEDY, and INEXPENSIVE disposition of every action and proceeding. They are NOT penal in nature. Strict construction is the exception — courts favor liberal construction to prevent injustice and to resolve cases on the merits rather than technicalities.` },
+
+  { topic:`general`, stmt:`Small claims cases filed in first-level courts are covered by the Rules of Court on ordinary civil procedure.`,
+    verdict:false, exp:`FALSE. Small claims cases (claims ≤₱1,000,000 under A.M. No. 08-8-7-SC as amended) are governed by the REVISED RULES OF PROCEDURE FOR SMALL CLAIMS CASES — a special simplified procedure. Parties appear WITHOUT LAWYERS (no counsel), there is no pre-trial, no full trial, and the decision is final and unappealable. The Rules of Court on ordinary procedure do NOT apply. This promotes speedy, informal resolution of small money claims.` },
+
+  // ── VENUE (+4) ──
+  { topic:`venue`, stmt:`In a personal action, the plaintiff must file the case where the defendant resides; the plaintiff's residence is irrelevant for venue purposes.`,
+    verdict:false, exp:`FALSE. Under Rule 4, Sec. 2: In PERSONAL ACTIONS, venue lies where the PLAINTIFF OR DEFENDANT RESIDES, at the PLAINTIFF'S ELECTION. Both residences are valid venues and the plaintiff chooses. This is different from real actions (where property is located) and from criminal actions (where the offense was committed). The plaintiff's residence is equally valid as a venue option in personal actions.` },
+
+  { topic:`venue`, stmt:`A venue stipulation that says "disputes shall be resolved in the courts of Makati City" is exclusive and bars filing in any other court.`,
+    verdict:false, exp:`FALSE. A venue stipulation is PERMISSIVE (merely adds a venue option) unless it contains words of EXCLUSIVITY such as "exclusively," "only," "to the exclusion of all other courts," or an express waiver of other venues. The phrase "disputes shall be resolved in Makati City" lacks exclusivity language — it merely designates Makati as an ADDITIONAL venue, not the only one. (Unimasters v. CA; Union Bank v. Maunlad Homes)` },
+
+  { topic:`venue`, stmt:`Improper venue may be raised by the court motu proprio at any stage of the proceedings.`,
+    verdict:false, exp:`FALSE. VENUE IS WAIVABLE and is NOT jurisdictional (except in criminal cases where venue is jurisdictional). Under Rule 9, Sec. 1: defenses and objections not raised in a motion to dismiss or in the answer are DEEMED WAIVED. Courts CANNOT raise improper venue motu proprio — only the defendant may object. If defendant answers on the merits without raising improper venue, it is waived forever. This contrasts with lack of SMJ, which courts may raise motu proprio anytime.` },
+
+  { topic:`venue`, stmt:`Forcible entry and unlawful detainer cases must be filed in the MTC of the municipality or city where the property is located, regardless of assessed value.`,
+    verdict:true, exp:`TRUE. Under Rule 70 and Sec. 33, BP 129: FORCIBLE ENTRY and UNLAWFUL DETAINER (ejectment cases) fall under the EXCLUSIVE ORIGINAL JURISDICTION of first-level courts (MTC/MeTC/MCTC) where the PROPERTY IS SITUATED — regardless of the assessed value or the rentals involved. This is an exception to the general jurisdictional rules: these cases are always in the MTC, never in the RTC, based on the nature of the action alone.` },
+
+  // ── DEFAULT (+4) ──
+  { topic:`default`, stmt:`An order of default is automatically issued by the court once the period to answer lapses without the defendant filing an answer.`,
+    verdict:false, exp:`FALSE. Default is NEVER automatic. Under Rule 9, Sec. 3: An order of default requires a MOTION by the claiming party (with notice to the defending party) and PROOF that defendant failed to answer within the reglementary period. Without this motion, the court cannot motu proprio declare default. This protects defendants from being blindsided and ensures the claiming party affirmatively seeks the default order.` },
+
+  { topic:`default`, stmt:`A defendant declared in default loses the right to appeal the judgment rendered against him.`,
+    verdict:false, exp:`FALSE. A defendant declared in default retains the RIGHT TO APPEAL the judgment — but on limited grounds. The defaulted defendant can appeal on the ground that: (a) the evidence does not support the judgment; or (b) the judgment exceeds what was prayed for. What the defaulted defendant CANNOT do is participate in the trial — cross-examine witnesses, present evidence, or file responsive pleadings. The right to appeal the final judgment survives default. (Rule 9, Sec. 3)` },
+
+  { topic:`default`, stmt:`A default judgment in an annulment of marriage case is void for having been rendered in violation of the rules.`,
+    verdict:true, exp:`TRUE. Under Rule 9, Sec. 3(e): NO DEFAULT may be declared against the defendant in cases for ANNULMENT OF MARRIAGE, DECLARATION OF NULLITY OF MARRIAGE, and LEGAL SEPARATION (ADS). Instead, the court must order the public prosecutor to investigate if collusion exists. A default judgment in an ADS case is VOID — it is rendered in excess of authority. The State has a paramount interest in preserving the sanctity of marriage and preventing collusive dissolutions.` },
+
+  { topic:`default`, stmt:`A party declared in default may still cross-examine plaintiff's witnesses if the defaulted party appears on the date of hearing.`,
+    verdict:false, exp:`FALSE. Under Rule 9, Sec. 3(a): A party in default SHALL NOT BE ALLOWED to take part in the trial. This means the defaulted party CANNOT: (a) cross-examine witnesses; (b) present evidence; (c) file pleadings or motions; or (d) otherwise participate in the proceedings. The only rights retained are: (a) to receive NOTICE of subsequent proceedings; and (b) to receive a copy of the judgment. The defaulted party is effectively "locked out" of the trial.` },
+
+  // ── SUMMONS (+3) ──
+  { topic:`summons`, stmt:`Service of summons by publication is available in ALL types of civil actions whenever the defendant cannot be personally served.`,
+    verdict:false, exp:`FALSE. Service by PUBLICATION is NOT universally available. Under Rule 14: (a) for IN REM and QUASI IN REM actions — publication is allowed when the defendant is a non-resident not found in the Philippines (extraterritorial service, Sec. 17); (b) for UNKNOWN defendants in any action (Sec. 16). But for IN PERSONAM actions against non-residents, publication alone does NOT confer jurisdiction over the person — personal service or voluntary appearance is needed. (Sps. Belen v. Chavez)` },
+
+  { topic:`summons`, stmt:`Under the 2019 Amendments, in-house counsel of a domestic corporation is a valid recipient of summons on behalf of the corporation.`,
+    verdict:true, exp:`TRUE. Rule 14, Sec. 12 (2019 Amendments) expanded the list of corporate officers on whom summons may be served. IN-HOUSE COUNSEL was added as a NEW valid recipient — alongside the president, managing partner, general manager, corporate secretary, and treasurer. If these officers are unavailable, their secretaries may receive. This amendment recognized that in-house counsel has sufficient authority and knowledge to receive and act on summons. (A.M. No. 19-10-20-SC)` },
+
+  { topic:`summons`, stmt:`Voluntary appearance by the defendant cures any defect in the service of summons and gives the court jurisdiction over the defendant's person.`,
+    verdict:true, exp:`TRUE. Under Rule 14, Sec. 23: The defendant's VOLUNTARY APPEARANCE in the action is EQUIVALENT to service of summons. It cures any defect in or absence of service. Filing an answer (even with a motion to dismiss on other grounds), filing a motion for extension, or otherwise invoking the court's authority constitutes voluntary appearance. However, filing a motion to dismiss SOLELY on the ground of lack of jurisdiction does NOT constitute voluntary appearance. (Miranda v. Tuliao)` },
+
+  // ── PARTIES (+2) ──
+  { topic:`parties`, stmt:`Non-joinder of an indispensable party is a ground for dismissal of the action.`,
+    verdict:false, exp:`FALSE. Under Rule 3, Sec. 11: Neither MISJOINDER nor NON-JOINDER of parties is a ground for DISMISSAL of an action. The remedy is for the court to ORDER the inclusion of the absent indispensable party — on motion or motu proprio at any stage. Only if the court orders inclusion and the plaintiff fails to comply without justifiable cause may dismissal be ordered. The law prefers resolving cases on the merits over dismissal on technicalities. (Republic v. Mangotara)` },
+
+  { topic:`parties`, stmt:`A class suit may be filed when the subject matter is of common or general interest to many persons so numerous that it is impracticable to bring them all before the court.`,
+    verdict:true, exp:`TRUE. Under Rule 3, Sec. 12: A CLASS SUIT requires: (1) the subject matter is of COMMON OR GENERAL INTEREST to MANY persons; (2) the parties are so NUMEROUS it is IMPRACTICABLE to join all as parties; and (3) the parties present are SUFFICIENTLY NUMEROUS AND REPRESENTATIVE to protect all interests. Courts closely scrutinize class suits — individual interests do not qualify (Newsweek v. IAC). The class must share a single, indivisible interest.` },
+
+  // ── PRETRIAL (+4) ──
+  { topic:`pretrial`, stmt:`Failure of both plaintiff and counsel to appear at the pre-trial conference has the same legal effect.`,
+    verdict:true, exp:`TRUE. Under Rule 18, Sec. 5: Failure of the PLAINTIFF to appear at pre-trial (with or without counsel) results in dismissal of the case with prejudice. Failure of PLAINTIFF'S COUNSEL alone (without the plaintiff also being absent) results in the same consequence. The rule is strict: if plaintiff — or plaintiff's counsel representing plaintiff — fails to appear, the sanction is dismissal with prejudice. Similarly, failure of DEFENDANT (or defendant's counsel) allows ex parte presentation of evidence.` },
+
+  { topic:`pretrial`, stmt:`The pre-trial order may be modified by the court at any time before judgment to prevent manifest injustice.`,
+    verdict:true, exp:`TRUE. While the PRE-TRIAL ORDER controls subsequent proceedings (Rule 18, Sec. 7), the court may MODIFY it to prevent MANIFEST INJUSTICE. This is a recognized exception — courts are not slaves to the pre-trial order when rigid adherence would result in a miscarriage of justice. The modification should be on motion and with good cause. This balances the need for order and efficiency in trial against the overarching goal of just adjudication.` },
+
+  { topic:`pretrial`, stmt:`During pre-trial, the court may on its own initiative refer the parties to mediation even without their agreement.`,
+    verdict:true, exp:`TRUE. Under Rule 18 (2019 Amendments): After the pre-trial conference, the court SHALL refer the parties to COURT-ANNEXED MEDIATION (CAM) — this referral is MANDATORY and does not require the parties' agreement. CAM is not optional; parties must attend. The mediator assists the parties in exploring amicable settlement within 30 days. Only JUDICIAL DISPUTE RESOLUTION (JDR) requires the judge's assessment that settlement is still possible — making it discretionary, not mandatory.` },
+
+  { topic:`pretrial`, stmt:`A pre-trial brief must be filed by the defendant at least 5 calendar days before the scheduled pre-trial.`,
+    verdict:false, exp:`FALSE. Under Rule 18, Sec. 6: Pre-trial briefs must be filed and served on all other parties at least THREE (3) CALENDAR DAYS before the date of the pre-trial conference — not 5 days. This applies to BOTH plaintiff AND defendant. Failure to file the pre-trial brief has the same legal consequence as failure to appear at the pre-trial conference. (3 days for both parties — this is a common bar exam trap.)` },
+
+  // ── DEMURRER (+3) ──
+  { topic:`demurrer`, stmt:`In a criminal case, the court may motu proprio demur to the evidence of the prosecution even without a motion by the accused.`,
+    verdict:true, exp:`TRUE. Under Rule 119, Sec. 23: In CRIMINAL CASES, the court may — after the prosecution rests — on its own initiative (MOTU PROPRIO) demur to the evidence and dismiss the case if the evidence is insufficient to sustain a conviction. This is different from CIVIL CASES where the court CANNOT motu proprio demur to the plaintiff's evidence — it must wait for a motion by the defendant. The criminal rule reflects the court's duty to protect the accused from clearly insufficient prosecutions.` },
+
+  { topic:`demurrer`, stmt:`An accused who files a demurrer to evidence in a criminal case without leave of court, and whose demurrer is denied, retains the right to present evidence in his defense.`,
+    verdict:false, exp:`FALSE. Under Rule 119, Sec. 23: In CRIMINAL CASES, if an accused files a demurrer to evidence WITHOUT LEAVE OF COURT and the demurrer is DENIED, the accused is deemed to have WAIVED the right to present evidence. The case is decided based solely on the prosecution's evidence. This is the severe penalty for filing without leave — it is a gamble. If the accused files WITH LEAVE and the demurrer is denied, the right to present evidence is preserved.` },
+
+  { topic:`demurrer`, stmt:`In a civil case, a demurrer to evidence may be filed as a matter of right without leave of court at any time after plaintiff rests.`,
+    verdict:true, exp:`TRUE. Under Rule 33, Sec. 1: In CIVIL CASES, a defendant may file a demurrer to evidence WITHOUT LEAVE OF COURT after the plaintiff has completed the presentation of evidence. No prior leave is required. Furthermore, unlike criminal cases, if the demurrer is DENIED, the defendant retains the full right to present evidence — there is NO penalty for filing without leave in civil cases. (Contrast: criminal cases require leave or risk waiver of right to present evidence.)` },
+
+  // ── DISCOVERY (+4) ──
+  { topic:`discovery`, stmt:`A party may take the deposition of any person, including a non-party, before the action is filed.`,
+    verdict:true, exp:`TRUE. Under Rule 24 (now Rule 23 as amended): A DEPOSITION BEFORE ACTION (deposition de bene esse) is allowed to perpetuate testimony — to preserve testimony that may otherwise be lost before the action is filed. The petitioner must show: (a) petition filed in the RTC; (b) petitioner expects to be a party to a future action; (c) subject matter of the expected action; (d) names of expected adverse parties; (e) substance of testimony desired; (f) reasons for perpetuating it.` },
+
+  { topic:`discovery`, stmt:`Trade secrets are discoverable through a motion for production and inspection of documents under Rule 27.`,
+    verdict:false, exp:`FALSE. Rule 27, Sec. 1 expressly EXCLUDES privileged information from the scope of production and inspection orders. TRADE SECRETS are PRIVILEGED and CONFIDENTIAL — they cannot be compelled through discovery. Ordering disclosure would expose the party to unfair business competition and violate proprietary rights. The court should deny any motion for production that seeks trade secrets or other privileged information. (Air Philippines Corp. v. Pennswell, Inc., 2007)` },
+
+  { topic:`discovery`, stmt:`A party who fails to file and serve a request for admission on the adverse party is barred from presenting evidence on facts that are within the adverse party's personal knowledge.`,
+    verdict:true, exp:`TRUE. Under Rule 26, Sec. 5: A party who FAILS TO FILE AND SERVE a request for admission of material and relevant facts that are or ought to be within the personal knowledge of the adverse party SHALL NOT BE PERMITTED to present evidence on such facts at trial — unless the court allows it for good cause to prevent a failure of justice. This rule encourages use of the request for admission as a discovery tool to narrow issues before trial. (Spouses Afulugencia v. Metrobank)` },
+
+  { topic:`discovery`, stmt:`Depositions may be used at trial to contradict or impeach the testimony of the deponent as a witness.`,
+    verdict:true, exp:`TRUE. Under Rule 23, Sec. 4(a): Any deposition may be used by any party for the purpose of CONTRADICTING OR IMPEACHING the testimony of the deponent as a witness. This applies regardless of whether the deponent is available to testify in person. Additionally, a deposition of a party or of someone who, at the time of taking the deposition, was an officer, director, or managing agent of a corporation may be used against that party for ANY PURPOSE — even substantively.` },
+
+  // ── APPEALS (+3) ──
+  { topic:`appeals`, stmt:`An appeal from an MTC decision rendered in the exercise of delegated jurisdiction in land registration cases goes directly to the Court of Appeals.`,
+    verdict:true, exp:`TRUE. Under Sec. 34, BP 129: Judgments of the MTC in the EXERCISE OF ITS DELEGATED JURISDICTION in land registration cases are appealable in the SAME MANNER as decisions of the RTC — i.e., directly to the COURT OF APPEALS by notice of appeal. This is an exception to the general rule that MTC decisions are appealed to the RTC first. Delegated jurisdiction elevates the appeal path to bypass the RTC. (BP 129, Sec. 34; 2009 Bar Exam)` },
+
+  { topic:`appeals`, stmt:`A petition for certiorari under Rule 65 must allege that no appeal or any other plain, speedy, and adequate remedy is available in the ordinary course of law.`,
+    verdict:true, exp:`TRUE. Under Rule 65, Sec. 1: For a petition for certiorari to prosper, the petitioner must allege that: (a) the tribunal acted WITHOUT or IN EXCESS OF JURISDICTION or with GRAVE ABUSE OF DISCRETION; AND (b) there is NO APPEAL or any other PLAIN, SPEEDY, AND ADEQUATE REMEDY available in the ordinary course of law. Certiorari is an extraordinary remedy — if an appeal is available, it must be used instead. Using Rule 65 as a substitute for a lost appeal is NOT allowed.` },
+
+  { topic:`appeals`, stmt:`The filing of a motion for reconsideration of a judgment is always required before filing a petition for certiorari under Rule 65.`,
+    verdict:false, exp:`FALSE. While an MR is GENERALLY required before filing Rule 65 certiorari (to give the court a chance to correct itself), it is NOT always required. EXCEPTIONS where MR is not necessary: (a) order is a patent nullity; (b) question raised is purely legal; (c) MR would be useless (e.g., court already expressed categorical ruling); (d) urgency; (e) grave irreparable injury; (f) MR was already filed but denied; (g) issue is on jurisdiction. (Laguna Metts Corp. v. CA; Sec. 1, Rule 65)` },
+
+  // ── JUDGMENTS (+3) ──
+  { topic:`judgments`, stmt:`A pro forma motion for reconsideration DOES toll the period to appeal.`,
+    verdict:false, exp:`FALSE. A PRO FORMA MOTION FOR RECONSIDERATION does NOT toll the period to appeal. A motion is pro forma (merely formal, without substance) if it: (a) raises no new arguments; (b) is a rehash of arguments already considered; (c) does not specify the findings of fact or conclusions of law complained of; or (d) is filed merely to delay. Under Rule 37, Sec. 2: Only a PROPER MR or MNT tolls the appeal period. A pro forma motion is treated as if no motion was filed.` },
+
+  { topic:`judgments`, stmt:`Summary judgment is appropriate only when there is no genuine issue as to any material fact and the moving party is entitled to judgment as a matter of law.`,
+    verdict:true, exp:`TRUE. Under Rule 35, Sec. 1-2: SUMMARY JUDGMENT is proper when: (1) there is NO GENUINE ISSUE as to any MATERIAL FACT; and (2) the moving party is ENTITLED TO JUDGMENT AS A MATTER OF LAW. A "genuine issue" is one that requires a trial — a sham or contrived issue that only appears on the face of the pleadings does not prevent summary judgment. The court looks beyond the pleadings to depositions, admissions, affidavits, and other evidence on record.` },
+
+  { topic:`judgments`, stmt:`After a judgment has become final and executory, it can never be modified under any circumstance.`,
+    verdict:false, exp:`FALSE. While the DOCTRINE OF IMMUTABILITY OF JUDGMENT generally prohibits modification of final judgments, there are recognized EXCEPTIONS: (a) correction of CLERICAL ERRORS; (b) NUNC PRO TUNC entries to record what was actually done; (c) VOID JUDGMENTS (lack of jurisdiction or due process violations) — may be attacked at any time; (d) SUPERVENING EVENTS making execution unjust or inequitable. These exceptions prevent the doctrine from being used as an instrument of injustice.` },
+
+  // ── EXECUTION (+2) ──
+  { topic:`execution`, stmt:`The family home is absolutely exempt from execution and cannot be levied upon under any circumstance.`,
+    verdict:false, exp:`FALSE. The family home is GENERALLY exempt from execution under Art. 155 of the Family Code. However, it is NOT absolutely exempt. It may be levied upon for: (a) non-payment of TAXES on the family home; (b) debts incurred BEFORE the constitution of the family home; (c) debts secured by MORTGAGES on the family home; (d) debts arising from LABORERS' COMPENSATION or non-payment of wages. The exemption protects the family's shelter but does not allow abuse of the privilege.` },
+
+  { topic:`execution`, stmt:`An alias writ of execution may be issued when the original writ was returned unsatisfied.`,
+    verdict:true, exp:`TRUE. Under Rule 39, Sec. 6: When a writ of execution is returned UNSATISFIED IN WHOLE OR IN PART, the judgment creditor is entitled to obtain an ALIAS WRIT OF EXECUTION (a second or subsequent writ) at any time within 5 years from the date of entry of the final judgment. The alias writ may issue without further motion or order of court once the original writ has been returned. Multiple alias writs may be issued until the judgment is fully satisfied within the 5-year period.` },
+
+  // ── REMEDIES (+2) ──
+  { topic:`remedies`, stmt:`Annulment of judgment under Rule 47 is available even if the party had an opportunity to file a petition for relief under Rule 38 but failed to do so.`,
+    verdict:true, exp:`TRUE. Under Rule 47, Sec. 1: The remedy of ANNULMENT OF JUDGMENT is available as an independent action even if: (a) the petitioner had an opportunity to avail of Rule 38 (petition for relief) but failed to do so; or (b) the remedy of Rule 38 is no longer available. Rule 47 is a LAST RESORT remedy — it is available when ordinary remedies (appeal, MR, MNT, petition for relief) are no longer available without fault of the petitioner. However, Rule 47 has only TWO grounds: extrinsic fraud and lack of jurisdiction.` },
+
+  { topic:`remedies`, stmt:`A petition for relief under Rule 38 must be filed within 60 days from the time the petitioner learns of the judgment, and not more than 6 months after the judgment was entered.`,
+    verdict:true, exp:`TRUE. Under Rule 38, Sec. 3: The petition must be filed within TWO PERIODS that must BOTH be satisfied: (a) within 60 DAYS from the time petitioner LEARNS of the judgment, final order, or proceeding; AND (b) not more than 6 MONTHS after the judgment or final order was ENTERED (recorded in the book of entries of judgments). Both periods are jurisdictional — failure to comply with either bars the petition. The 60-day period runs from actual knowledge, not from constructive notice.` },
+
+  // ── DISMISSAL (+3) ──
+  { topic:`dismissal`, stmt:`A case dismissed due to plaintiff's failure to appear at pre-trial is dismissed with prejudice and bars refiling.`,
+    verdict:true, exp:`TRUE. Under Rule 18, Sec. 5 (2019 Amendments): If PLAINTIFF fails to appear at pre-trial without valid cause, the case is DISMISSED WITH PREJUDICE — unless the court orders otherwise in its dismissal order. A dismissal with prejudice operates as an ADJUDICATION ON THE MERITS under Rule 17, Sec. 3. It is equivalent to a judgment against plaintiff and bars refiling of the same action. This is a severe sanction to enforce the mandatory nature of pre-trial attendance.` },
+
+  { topic:`dismissal`, stmt:`Under the two-dismissal rule, the second notice of dismissal filed by the plaintiff operates as an adjudication on the merits (dismissal with prejudice).`,
+    verdict:true, exp:`TRUE. Under Rule 17, Sec. 1: The TWO-DISMISSAL RULE provides that if the plaintiff dismisses an action by notice of dismissal for the SECOND TIME on the basis of or including the SAME CLAIM, the dismissal operates as an ADJUDICATION ON THE MERITS — i.e., with prejudice, barring refiling. The first dismissal by notice is without prejudice; the second on the same claim is final. Purpose: prevent harassment of defendants through repeated filing and dismissal.` },
+
+  { topic:`dismissal`, stmt:`The defendant may move to dismiss a complaint on the ground that the plaintiff has no legal capacity to sue under the 2019 Amendments.`,
+    verdict:false, exp:`FALSE. Under the 2019 Amendments (Rule 15, Sec. 12): Only THREE grounds may be raised in a MOTION TO DISMISS: (1) lack of jurisdiction over the SUBJECT MATTER; (2) LITIS PENDENTIA; (3) res judicata or PRESCRIPTION. Lack of legal capacity to sue is NOT among the three surviving MTD grounds. It must be raised as an AFFIRMATIVE DEFENSE in the ANSWER or it is deemed waived. Filing a motion to dismiss on this ground would be a PROHIBITED MOTION under the 2019 Amendments.` },
+
+  // ── INTERVENTION (+3) ──
+  { topic:`intervention`, stmt:`A person who intervenes in a pending case becomes a party to the action with the same rights and obligations as the original parties.`,
+    verdict:true, exp:`TRUE. Under Rule 19: Once intervention is allowed by the court, the intervenor becomes a PARTY TO THE ACTION. The intervenor files a complaint-in-intervention (if asserting a claim) or an answer-in-intervention (if defending). The intervenor has the same rights as the original parties — to present evidence, cross-examine witnesses, appeal, etc. However, intervention cannot be used to expand the original claims beyond the scope of the pending action.` },
+
+  { topic:`intervention`, stmt:`An intervenor who claims ownership of the subject property has a legal interest sufficient to warrant intervention, even if the intervenor is not a party to the original contract.`,
+    verdict:true, exp:`TRUE. A person claiming OWNERSHIP of the subject matter of the litigation has a LEGAL INTEREST in the controversy — specifically, a legal interest that will be materially and directly affected by the court's judgment. The intervenor need not be a party to the contract — what matters is that the judgment will directly affect the intervenor's rights or property. (Rule 19, Sec. 1; Sec. 1 also includes those adversely affected by distribution of property in court custody)` },
+
+  { topic:`intervention`, stmt:`Intervention is allowed even after a final judgment has been rendered by the trial court if the intervenor was an indispensable party.`,
+    verdict:false, exp:`FALSE. The GENERAL RULE under Rule 19, Sec. 2 is that intervention must be filed BEFORE RENDITION OF JUDGMENT by the trial court. Late intervention is generally NOT allowed even for indispensable parties — the proper remedy for an indispensable party who was not impleaded is to seek ANNULMENT OF JUDGMENT (Rule 47) on the ground of lack of jurisdiction or extrinsic fraud, or to file a separate action. Intervention after judgment is only allowed in very exceptional circumstances in higher courts.` },
+
+
+  { topic:`discovery`, stmt:`A party may depose any person — party or non-party — without leave of court once an action has been filed.`,
+    verdict:true, exp:`TRUE. Under Rule 23, Sec. 1: After jurisdiction has been obtained over any defendant or over property that is the subject of the action, OR after commencement of the action, a party may take the deposition of any person — whether a party or not — by oral examination or written interrogatories WITHOUT LEAVE OF COURT. Leave is only required when a party wants to take a deposition before service of the answer (Rule 23, Sec. 1, first paragraph). Once the answer is served, no leave is needed.` },
+
+  { topic:`dismissal`, stmt:`A voluntary dismissal by the plaintiff without court order (by notice) after the defendant has filed a counterclaim requires the defendant's consent to be effective.`,
+    verdict:false, exp:`FALSE. Under Rule 17, Sec. 1: Plaintiff may dismiss by NOTICE (without court order) at any time BEFORE service of the answer or a motion for summary judgment — NO consent from defendant is needed. If defendant has already filed an answer with a COUNTERCLAIM, the dismissal of the complaint does NOT affect the counterclaim — the counterclaim survives and defendant may prosecute it. The defendant's CONSENT to dismiss the counterclaim would be needed to extinguish it, but not to dismiss the main complaint.` },
+
+  { topic:`dismissal`, stmt:`A defendant can move to dismiss a case on the ground of failure to state a cause of action under the 2019 Rules of Civil Procedure.`,
+    verdict:false, exp:`FALSE. Under the 2019 Amendments (Rule 15, Sec. 12): Only THREE grounds remain for a MOTION TO DISMISS: (1) lack of SMJ; (2) litis pendentia; (3) prescription/res judicata. FAILURE TO STATE A CAUSE OF ACTION is NO LONGER a valid MTD ground — it must be raised as an AFFIRMATIVE DEFENSE in the ANSWER (Rule 8, Sec. 12[g]). However, it may be raised anytime. Filing an MTD on this ground is now a PROHIBITED MOTION that must be denied outright.` },
+
+  { topic:`intervention`, stmt:`In an intervention, the intervenor-plaintiff must obtain leave of court before filing a complaint-in-intervention.`,
+    verdict:true, exp:`TRUE. Under Rule 19, Sec. 2: A person desiring to intervene must FILE A MOTION FOR LEAVE to file an intervention, accompanied by the pleading-in-intervention. The court will grant leave only if the intervenor shows: (a) legal interest in the controversy; (b) intervention will not unduly delay or prejudice original parties; and (c) rights cannot be fully protected in a separate proceeding. Without leave, an intervenor cannot unilaterally become a party — leave is mandatory.` },
+
+  { topic:`intervention`, stmt:`An intervenor who is allowed to intervene may be ordered to pay costs if the court finds the intervention was improper.`,
+    verdict:true, exp:`TRUE. Under Rule 19: The court has broad discretion to impose terms and conditions when granting intervention, including ordering the intervenor to pay COSTS if the intervention was improper or caused undue delay or prejudice to the original parties. Costs are a recognized sanction for improper intervention. The court may also later order the intervenor to pay damages suffered by the original parties caused by the intervenor's participation. The court's discretion over intervention is plenary.` },
+
 ];
 
 // ── ESSAY / ENUMERATION DATA ──
 const essayData = [
-  { type:`enum`, q:`Enumerate the 3 elements of jurisdiction over a case.`, hint:`Focus on jurisdiction over (1)___, (2)___, and (3)___.`,
+  { type:`enum`, topic:`jurisdiction`, q:`Enumerate the 3 elements of jurisdiction over a case.`, hint:`Focus on jurisdiction over (1)___, (2)___, and (3)___.`,
     model:`(1) JURISDICTION OVER THE SUBJECT MATTER — conferred by law, determined by allegations in the complaint and law in force at filing; cannot be waived or conferred by agreement.
 (2) JURISDICTION OVER THE PARTIES — over the plaintiff: by filing the complaint; over the defendant: by valid service of summons or voluntary appearance.
 (3) JURISDICTION OVER THE RES — over the property or thing in dispute; relevant in actions in rem and quasi in rem; acquired through seizure or publication.` },
-  { type:`essay`, q:`Distinguish a compulsory counterclaim from a permissive counterclaim. What is the consequence of failing to set up a compulsory counterclaim?`,
+  { type:`essay`, topic:`pleadings`, q:`Distinguish a compulsory counterclaim from a permissive counterclaim. What is the consequence of failing to set up a compulsory counterclaim?`,
     model:`A COMPULSORY COUNTERCLAIM is a claim by a defending party against the opposing party that arises out of or is connected with the transaction or occurrence constituting the subject matter of the opposing party's claim, and does not require for its adjudication the presence of third parties over whom the court cannot acquire jurisdiction (Rule 6, Sec. 7). It must be pleaded in the same action or it is BARRED (Rule 9, Sec. 2).
 
 A PERMISSIVE COUNTERCLAIM is any other counterclaim that does not arise from the same transaction. It is not compulsory, does not need to be pleaded in the same action, and requires payment of separate docket fees.
 
 CONSEQUENCE OF FAILURE TO SET UP: A compulsory counterclaim not raised in the answer is permanently barred and cannot be pursued in a separate action. This is to avoid multiplicity of suits and ensure all related claims are resolved in one proceeding.` },
-  { type:`enum`, q:`Enumerate at least 5 PROHIBITED MOTIONS under Rule 15, Section 12 of the 2019 Amendments.`,
+  { type:`enum`, topic:`pleadings`, q:`Enumerate at least 5 PROHIBITED MOTIONS under Rule 15, Section 12 of the 2019 Amendments.`,
     model:`The following motions are prohibited:
 (a) Motion to dismiss EXCEPT on 3 grounds: (1) no SMJ; (2) litis pendentia; (3) res judicata / prescription
 (b) Motion to HEAR affirmative defenses
@@ -1302,7 +1597,7 @@ CONSEQUENCE OF FAILURE TO SET UP: A compulsory counterclaim not raised in the an
 (d) Motion to SUSPEND PROCEEDINGS without a TRO/injunction from a higher court
 (e) Motion for EXTENSION of time to file pleadings, affidavits or other papers (except extension to file an answer)
 (f) Motion for POSTPONEMENT intended for delay (except if based on acts of God, force majeure, or physical inability of witness)` },
-  { type:`essay`, q:`Explain the doctrine of primary jurisdiction. When does it apply, and what are its effects?`,
+  { type:`essay`, topic:`jurisdiction`, q:`Explain the doctrine of primary jurisdiction. When does it apply, and what are its effects?`,
     model:`The DOCTRINE OF PRIMARY JURISDICTION holds that courts of justice should refrain from resolving a controversy that requires the technical expertise of an administrative agency. Where a claim involves specialized matters within the peculiar competence of an administrative body, courts must defer to the agency in the first instance.
 
 APPLICATION: When (1) both the court and the administrative agency have concurrent original jurisdiction over a matter, AND (2) the agency has been specifically vested with jurisdiction requiring technical expertise or knowledge of special facts.
@@ -1310,13 +1605,13 @@ APPLICATION: When (1) both the court and the administrative agency have concurre
 EFFECT: The court does not dismiss the case but SUSPENDS PROCEEDINGS and refers the parties to the administrative agency. After the agency acts, the court may resume jurisdiction.
 
 KEY CASES: MMDA v. DM Consunji (2019) — CIAC has primary jurisdiction over construction disputes; Republic v. Sali.` },
-  { type:`enum`, q:`Enumerate the modes of substituted service of summons under Rule 14, Sec. 6 of the 2019 Amendments.`,
+  { type:`enum`, topic:`summons`, q:`Enumerate the modes of substituted service of summons under Rule 14, Sec. 6 of the 2019 Amendments.`,
     model:`After at least 3 attempts on at least 2 different dates, substituted service may be effected by:
 (a) Leaving copies at defendant's RESIDENCE with a person AT LEAST 18 YEARS OLD and of sufficient discretion residing therein;
 (b) Leaving copies at defendant's OFFICE or regular place of business with a COMPETENT PERSON IN CHARGE (including one who customarily receives correspondence);
 (c) Leaving copies with any OFFICER OF THE HOA/CONDO CORPORATION, or its CHIEF SECURITY OFFICER in charge of the building/community, if refused entry;
 (d) Sending by ELECTRONIC MAIL to defendant's email address, if allowed by the court.` },
-  { type:`essay`, q:`What is forum shopping? Give the test for forum shopping and state its consequences.`,
+  { type:`essay`, topic:`forum-shopping`, q:`What is forum shopping? Give the test for forum shopping and state its consequences.`,
     model:`FORUM SHOPPING is the filing of multiple suits involving the same parties, for the same cause of action, and praying for the same relief, with the deliberate intent of selecting a favorable forum.
 
 TEST (three-fold identity): Forum shopping exists when there is identity of:
@@ -1331,7 +1626,7 @@ CONSEQUENCES (Rule 7, Sec. 5):
 (c) If willful and deliberate: SUMMARY DISMISSAL WITH PREJUDICE + DIRECT CONTEMPT + administrative sanctions against counsel
 
 KEY CASES: Arevalo v. Planters Dev't Bank; Galang v. Peakhold Finance.` },
-  { type:`enum`, q:`Enumerate the cases or actions where default is NOT allowed under the Rules of Court.`,
+  { type:`enum`, topic:`default`, q:`Enumerate the cases or actions where default is NOT allowed under the Rules of Court.`,
     model:`Under Rule 9, Sec. 3(e) and related provisions, default is NOT allowed in:
 (1) Action for ANNULMENT OF MARRIAGE
 (2) Action for DECLARATION OF NULLITY OF MARRIAGE
@@ -1343,7 +1638,7 @@ In these cases, if defendant fails to answer, the court orders the Solicitor Gen
 ADDITIONAL CASES under special rules:
 (4) Cases where the GOVERNMENT is the adverse party (government cannot be in default against its citizens)
 (5) Cases governed by the RULE ON SUMMARY PROCEDURE (failure to answer is not treated as default in the traditional sense)` },
-  { type:`essay`, q:`Distinguish an action in personam, in rem, and quasi in rem. What are the implications as to service of summons?`,
+  { type:`essay`, topic:`jurisdiction`, q:`Distinguish an action in personam, in rem, and quasi in rem. What are the implications as to service of summons?`,
     model:`ACTION IN PERSONAM: Directed against a SPECIFIC PERSON to impose personal liability. Judgment is binding only on the parties. Requires PERSONAL SERVICE of summons to acquire jurisdiction over the defendant. Extraterritorial service NOT sufficient for in personam actions.
 
 ACTION IN REM: Directed against the WHOLE WORLD; concerns the status of a thing or person (e.g., land registration, adoption). The court acquires jurisdiction over the res itself. Service by PUBLICATION may be sufficient since jurisdiction is over the property, not the person.
@@ -1353,7 +1648,7 @@ ACTION QUASI IN REM: Directed against a SPECIFIC PERSON but the judgment affects
 SUMMARY: For in personam → personal service required; for in rem/quasi in rem → publication or constructive service sufficient.
 KEY CASES: Lucas v. Lucas (DNA testing); de Pedro v. Romasan (quasi in rem)` },
   // NEW ESSAYS FROM BLUE NOTES
-  { type:`essay`, q:`Distinguish between compulsory and permissive counterclaims as to: (a) docket fees; (b) forum shopping certification; (c) effect of failure to raise; and (d) independent filing.`,
+  { type:`essay`, topic:`pleadings`, q:`Distinguish between compulsory and permissive counterclaims as to: (a) docket fees; (b) forum shopping certification; (c) effect of failure to raise; and (d) independent filing.`,
     model:`(a) DOCKET FEES:
 • Compulsory counterclaim: NO docket fees required — not an initiatory pleading
 • Permissive counterclaim: REQUIRES docket fees — treated as initiatory pleading for separate action
@@ -1371,7 +1666,7 @@ KEY CASES: Lucas v. Lucas (DNA testing); de Pedro v. Romasan (quasi in rem)` },
 • Permissive counterclaim: May be filed as independent, separate action
 
 EXCEPTION: A compulsory counterclaim not set up due to oversight, inadvertence, or excusable neglect may be raised via amendment or supplemental pleading before judgment. (Rule 11, Secs. 9-10)` },
-  { type:`enum`, q:`Enumerate the grounds for dismissal WITH PREJUDICE (which bar refiling of the same action).`,
+  { type:`enum`, topic:`dismissal`, q:`Enumerate the grounds for dismissal WITH PREJUDICE (which bar refiling of the same action).`,
     model:`Grounds for dismissal WITH PREJUDICE under the Rules of Court (these bar refiling):
 (1) RES JUDICATA — prior final judgment on the merits
 (2) PRESCRIPTION — claim is barred by statute of limitations
@@ -1382,7 +1677,7 @@ EXCEPTION: A compulsory counterclaim not set up due to oversight, inadvertence, 
 (7) Dismissal due to plaintiff's fault under Sec. 3, Rule 17 (failure to appear/prosecute/comply) — unless otherwise declared by the court
 (8) Dismissal due to WILLFUL AND DELIBERATE FORUM SHOPPING
 (9) FAILURE OF PLAINTIFF TO APPEAR AT PRE-TRIAL when the order states the dismissal is with prejudice` },
-  { type:`essay`, q:`Explain the scope of examination in depositions (Rule 23). What objections may be raised and how are they handled?`,
+  { type:`essay`, topic:`discovery`, q:`Explain the scope of examination in depositions (Rule 23). What objections may be raised and how are they handled?`,
     model:`SCOPE OF EXAMINATION IN DEPOSITIONS (Rule 23, Sec. 2):
 A deponent may be examined on ANY MATTER NOT PRIVILEGED and which is RELEVANT to the subject of the pending action, including:
 (1) Claim or defense of any other party;
@@ -1400,7 +1695,7 @@ Objections to admissibility may be made at the TRIAL OR HEARING when the deposit
 
 TERMINATION OR LIMITATION: The taking may be terminated or limited upon motion showing the examination is in bad faith or unreasonably annoys, embarrasses, or oppresses the deponent.` },
 
-  { type:`essay`, q:`Distinguish Rule 45 (Petition for Review on Certiorari) from Rule 65 (Certiorari). When is each the proper remedy?`,
+  { type:`essay`, topic:`appeals`, q:`Distinguish Rule 45 (Petition for Review on Certiorari) from Rule 65 (Certiorari). When is each the proper remedy?`,
     model:`RULE 45 — Petition for Review on Certiorari:
 (1) Mode of APPEAL — continuation of the original action
 (2) Raises only QUESTIONS OF LAW
@@ -1425,7 +1720,7 @@ RULE OF THUMB:
 
 KEY DOCTRINE: Filing certiorari when appeal is the proper remedy, or when appeal is available, is IMPROPER. Certiorari cannot substitute for a lost appeal.` },
 
-  { type:`enum`, q:`Enumerate the properties that are EXEMPT from execution under Rule 39, Sec. 13.`,
+  { type:`enum`, topic:`execution`, q:`Enumerate the properties that are EXEMPT from execution under Rule 39, Sec. 13.`,
     model:`The following are exempt from execution (Rule 39, Sec. 13):
 (1) Family home as provided by law and the homestead in which he resides
 (2) Ordinary tools and implements used in his trade, employment, or livelihood
@@ -1440,7 +1735,7 @@ KEY DOCTRINE: Filing certiorari when appeal is the proper remedy, or when appeal
 (11) Monies, benefits, privileges, and annuities under GSIS (RA 8291)
 (12) Properties specifically exempted by law` },
 
-  { type:`essay`, q:`Explain the grounds for issuance of a preliminary injunction and the distinctions among preliminary injunction, TRO, and a permanent injunction.`,
+  { type:`essay`, topic:`provisional-remedies`, q:`Explain the grounds for issuance of a preliminary injunction and the distinctions among preliminary injunction, TRO, and a permanent injunction.`,
     model:`PRELIMINARY INJUNCTION (Rule 58, Sec. 3) — Grounds:
 (a) The applicant is ENTITLED TO THE RELIEF DEMANDED, and the relief consists in restraining the commission or continuance of the act/s complained of, or requiring performance of an act/s, for a limited period
 (b) Commission or continuance of some act complained of during the litigation would work INJUSTICE to applicant
@@ -1470,7 +1765,7 @@ STATUS QUO ANTE ORDER (SQAO):
 
 KEY: Injunctive relief does NOT decide the merits — it only preserves the status quo` },
 
-  { type:`essay`, q:`Distinguish "bar by prior judgment" from "conclusiveness of judgment" under Rule 39, Sec. 47. Give examples of each.`,
+  { type:`essay`, topic:`judgments`, q:`Distinguish "bar by prior judgment" from "conclusiveness of judgment" under Rule 39, Sec. 47. Give examples of each.`,
     model:`RULE 39, SEC. 47 — Two Concepts of Res Judicata:
 
 (b) BAR BY PRIOR JUDGMENT (also called "claim preclusion"):
@@ -1487,7 +1782,7 @@ KEY: Injunctive relief does NOT decide the merits — it only preserves the stat
 
 KEY MNEMONIC: Bar = same COA, everything barred. Conclusiveness = different COA, only specific issues barred.` },
 
-  { type:`enum`, q:`Enumerate the grounds for DISMISSAL WITH PREJUDICE and DISMISSAL WITHOUT PREJUDICE under the Rules of Court. Distinguish their effects.`,
+  { type:`enum`, topic:`dismissal`, q:`Enumerate the grounds for DISMISSAL WITH PREJUDICE and DISMISSAL WITHOUT PREJUDICE under the Rules of Court. Distinguish their effects.`,
     model:`DISMISSAL WITH PREJUDICE (bars refiling):
 (1) Res judicata — prior final judgment on merits (Rule 15, Sec. 13[a])
 (2) Prescription — action barred by statute of limitations (Rule 15, Sec. 13[b])
@@ -1670,10 +1965,6 @@ EFFECT OF WITHOUT PREJUDICE: Plaintiff may refile same action; does NOT bar futu
     opts:[`File a petition for review directly with the CA`,`File a NOTICE OF APPEAL (Rule 40) with the MTC within 15 days; appeal goes to the RTC`,`File a petition for certiorari with the RTC`,`File a petition for review on certiorari with the SC`],
     ans:1, exp:`Rule 40: Appeal from the MTC is taken by filing a NOTICE OF APPEAL with the TRIAL COURT (MTC) within 15 days. The appeal goes to the RTC. Exception: If the MTC exercised DELEGATED JURISDICTION (e.g., land registration), the judgment is appealable in the same manner as RTC decisions — directly to the CA. (Sec. 34, BP 129)` },
 
-  { topic:`appeals`, q:`Distinguish Rule 45 (Petition for Review on Certiorari) from Rule 65 (Certiorari).`,
-    opts:[`Both are appeals; Rule 45 is to the SC and Rule 65 is to the CA`,`Rule 45: appeal on pure QUESTIONS OF LAW, 15 days, continuation of the case. Rule 65: original action questioning JURISDICTION or GRAVE ABUSE, 60 days, NOT a substitute for lost appeal, requires no other adequate remedy`,`Rule 45 covers factual questions; Rule 65 covers legal questions`,`They are interchangeable; choice depends on the court`],
-    ans:1, exp:`Rule 45: (1) MODE OF APPEAL — continuation of original case on SC review; (2) PURE QUESTIONS OF LAW only; (3) 15 days from notice of judgment/order; (4) filing stays execution. Rule 65: (1) SPECIAL CIVIL ACTION — original action; (2) questions JURISDICTION or GRAVE ABUSE OF DISCRETION; (3) 60 days from notice; (4) NOT a substitute for a lost appeal; (5) requires no other plain, speedy, adequate remedy.` },
-
   { topic:`appeals`, q:`When is a record on appeal required?`,
     opts:[`In every appeal from the RTC to the CA`,`Only in SPECIAL PROCEEDINGS and cases where MULTIPLE OR SEPARATE APPEALS are allowed`,`Only in appeals involving real property`,`In all appeals to the SC`],
     ans:1, exp:`Rule 41, Sec. 2: A RECORD ON APPEAL is required only in: (1) SPECIAL PROCEEDINGS (e.g., estate settlement, guardianship, adoption); and (2) cases where MULTIPLE OR SEPARATE APPEALS are allowed (e.g., partial judgments in multiple claims). In ordinary civil cases with a single judgment, only a NOTICE OF APPEAL is required.` },
@@ -1825,10 +2116,6 @@ EFFECT OF WITHOUT PREJUDICE: Plaintiff may refile same action; does NOT bar futu
     opts:[`Any casual or incidental interest in the case`,`Legal interest in the matter in controversy, OR in the success of either party, OR against both; OR being adversely affected by a distribution of property in court custody`,`Merely economic interest in the outcome`,`Contractual interest with any party to the case`],
     ans:1, exp:`Under Rule 19, Sec. 1: A person may intervene by showing: (a) LEGAL INTEREST in the matter in controversy; (b) legal interest in the SUCCESS of either party; (c) legal interest AGAINST BOTH parties; or (d) being so situated as to be ADVERSELY AFFECTED by a distribution or other disposition of PROPERTY IN COURT CUSTODY. Two additional conditions: (e) intervention will NOT unduly delay or prejudice the original parties; and (f) intervenor's rights cannot be fully protected in a separate proceeding.` },
 
-  { topic:`intervention`, q:`When must a motion to intervene be filed?`,
-    opts:[`At any time — even after final judgment, since the intervenor was not a party`,`Before rendition of judgment by the trial court; leave of court is required and may be denied if it would delay or prejudice original parties`,`Only during pre-trial, when issues are still being defined`,`Within 30 days from learning of the pendency of the case`],
-    ans:1, exp:`Under Rule 19, Sec. 2: A motion to intervene must be filed ANY TIME BEFORE RENDITION OF JUDGMENT by the trial court. It requires LEAVE OF COURT. The court will deny leave if intervention will unduly delay or prejudice the adjudication of rights of the original parties, or if the intervenor's rights can be fully protected in a separate proceeding. Late intervention (after judgment) is generally not allowed UNLESS special circumstances exist.` },
-
   // ── DISCOVERY ──
   { topic:`discovery`, q:`Under Rule 23, may a deposition be used as evidence at trial even if the deponent is available to testify in person?`,
     opts:[`No — depositions are only for preservation of testimony when the witness is unavailable`,`Yes — depositions of ADVERSE PARTIES may be used by the opposing party for any purpose, even if the deponent is available`,`No — depositions are always hearsay`,`Yes — but only with the court's prior permission`],
@@ -1909,6 +2196,10 @@ EFFECT OF WITHOUT PREJUDICE: Plaintiff may refile same action; does NOT bar futu
   { topic:`appeals`, q:`What is the difference between Rule 41 and Rule 42 appeals from the RTC?`,
     opts:[`Rule 41 goes to SC; Rule 42 goes to CA`,`Rule 41 (Notice of Appeal → CA): RTC in ORIGINAL jurisdiction. Rule 42 (Petition for Review → CA): RTC in APPELLATE jurisdiction (i.e., RTC decided an appeal from MTC)`,`Rule 41 is for civil cases; Rule 42 is for criminal cases`,`Rule 41 requires payment of docket fees; Rule 42 does not`],
     ans:1, exp:`RULE 41 (Ordinary Appeal): Filed by NOTICE OF APPEAL when the RTC exercises ORIGINAL jurisdiction — the RTC tried and decided the case as the first court. Appeal goes to the COURT OF APPEALS. 15 days to file. RULE 42 (Petition for Review): Filed as a PETITION when the RTC exercises APPELLATE jurisdiction — the RTC decided an appeal from the MTC. Appeal also goes to the CA. 15 days to file. The key distinction: was the RTC the first court (original) or second court (appellate)?` },
+
+  { topic:`trial`, q:`During trial, plaintiff's counsel was unable to proceed because a key witness was suddenly hospitalized. Plaintiff moved for postponement. What must the motion show under Rule 30?`,
+    opts:[`Only that the witness is unavailable on that date`,`An affidavit showing (a) the MATERIALITY of the absent evidence, (b) DUE DILIGENCE to procure it, and (c) the evidence is not merely cumulative`,`Only that defendant will not be prejudiced`,`A doctor's certificate attesting to the witness's condition`],
+    ans:1, exp:`Under Rule 30, Sec. 3: A motion to postpone trial for ABSENCE OF EVIDENCE (witness or documentary) must be supported by an AFFIDAVIT showing: (1) the MATERIALITY of the testimony or document; (2) DUE DILIGENCE was exercised to procure the attendance or production; and (3) the evidence is not merely cumulative. A mere doctor's certificate is insufficient without the affidavit. The court may also require the moving party to admit the adverse party's testimony on the absent evidence's substance as a condition for postponement. (Rule 30, Sec. 3-4)` },
 ];
 
 function buildQuiz() {
@@ -1942,7 +2233,11 @@ function buildMCQ(container) {
       <div class="quiz-number"><span style="background:var(--accent);color:white;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">MCQ ${i+1}/${data.length}${topicLabel}</span>${topicTag}</div>
       <div class="quiz-q" style="margin-top:0.6rem;">${q.q}</div>
       <div class="quiz-options" id="opts-${i}">
-        ${q.opts.map((o,j) => `<label id="lbl-${i}-${j}"><input type="radio" name="q${i}" value="${j}"> ${String.fromCharCode(65+j)}. ${o}</label>`).join('')}
+        ${q.opts.map((o,j) => `<label id="lbl-${i}-${j}"><input type="radio" name="q${i}" value="${j}" onchange="resetItemResult(${i},'mcq')"> ${String.fromCharCode(65+j)}. ${o}</label>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+        <button class="btn-check-item" id="chk-${i}" onclick="checkMCQItem(${i})">Check Answer</button>
+        <span class="item-result-badge" id="badge-${i}" style="display:none;"></span>
       </div>
       <div class="quiz-explanation" id="exp-${i}"><strong>📖 Explanation:</strong> ${q.exp}</div>
     `;
@@ -1951,15 +2246,27 @@ function buildMCQ(container) {
 }
 
 function buildTF(container) {
-  tfData.forEach((q, i) => {
-    const div = document.createElement(`div`);
-    div.className = `quiz-card`;
+  const data = getFilteredTF();
+  if (data.length === 0) {
+    container.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.85rem;">No T/F questions for this topic yet.</div>`;
+    document.getElementById('quiz-actions').style.display = 'none';
+    return;
+  }
+  const topicLabel = currentTFTopic === 'all' ? '' : ` · ${tfTopicMeta[currentTFTopic]?.label || currentTFTopic}`;
+  data.forEach((q, i) => {
+    const topicTag = q.topic && tfTopicMeta[q.topic] ? `<span style="background:${tfTopicMeta[q.topic].color};color:white;padding:0.1rem 0.45rem;border-radius:3px;font-size:0.6rem;font-family:'IBM Plex Mono',monospace;margin-left:0.4rem;">${tfTopicMeta[q.topic].label}</span>` : '';
+    const div = document.createElement('div');
+    div.className = 'quiz-card';
     div.innerHTML = `
-      <div class="quiz-number"><span style="background:var(--gold);color:white;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">TRUE/FALSE ${i+1}/${tfData.length}</span></div>
+      <div class="quiz-number"><span style="background:var(--gold);color:white;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">TRUE/FALSE ${i+1}/${data.length}${topicLabel}</span>${topicTag}</div>
       <div class="quiz-q" style="margin-top:0.6rem;font-style:italic;">"${q.stmt}"</div>
       <div class="quiz-options" id="opts-${i}">
-        <label id="lbl-${i}-T"><input type="radio" name="tf${i}" value="T"> ✓ TRUE</label>
-        <label id="lbl-${i}-F"><input type="radio" name="tf${i}" value="F"> ✗ FALSE</label>
+        <label id="lbl-${i}-T"><input type="radio" name="tf${i}" value="T" onchange="resetItemResult(${i},'tf')"> ✓ TRUE</label>
+        <label id="lbl-${i}-F"><input type="radio" name="tf${i}" value="F" onchange="resetItemResult(${i},'tf')"> ✗ FALSE</label>
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.3rem;">
+        <button class="btn-check-item" id="chk-${i}" onclick="checkTFItem(${i})">Check Answer</button>
+        <span class="item-result-badge" id="badge-${i}" style="display:none;"></span>
       </div>
       <div class="quiz-explanation" id="exp-${i}"><strong>📖 Answer:</strong> ${q.exp}</div>
     `;
@@ -1968,16 +2275,25 @@ function buildTF(container) {
 }
 
 function buildEssay(container) {
-  essayData.forEach((q, i) => {
+  const data = getFilteredEssay();
+  if (data.length === 0) {
+    container.innerHTML = `<div style="padding:2rem;text-align:center;color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:0.85rem;">No questions for this topic yet.</div>`;
+    document.getElementById('quiz-actions').style.display = 'none';
+    return;
+  }
+  const topicLabel = currentEssayTopic === 'all' ? '' : ` · ${essayTopicMeta[currentEssayTopic]?.label || currentEssayTopic}`;
+  data.forEach((q, i) => {
     const typeLabel = q.type === `enum` ? `ENUMERATION` : `ESSAY`;
     const typeColor = q.type === `enum` ? `var(--green)` : `#7d3cac`;
     const div = document.createElement(`div`);
     div.className = `quiz-card`;
+    const essayTopicTag = q.topic && essayTopicMeta[q.topic] ? `<span style="background:${essayTopicMeta[q.topic].color};color:white;padding:0.1rem 0.45rem;border-radius:3px;font-size:0.6rem;font-family:'IBM Plex Mono',monospace;margin-left:0.4rem;">${essayTopicMeta[q.topic].label}</span>` : ``;
     div.innerHTML = `
-      <div class="quiz-number"><span style="background:${typeColor};color:white;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">${typeLabel} ${i+1}/${essayData.length}</span></div>
+      <div class="quiz-number"><span style="background:${typeColor};color:white;padding:0.15rem 0.5rem;border-radius:3px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">${typeLabel} ${i+1}/${data.length}${topicLabel}</span>${essayTopicTag}</div>
       ${q.hint ? `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--gold);margin:0.4rem 0;">💡 ${q.hint}</div>` : ''}
       <div class="quiz-q" style="margin-top:0.5rem;">${q.q}</div>
       <textarea id="essay-${i}" placeholder="Write your answer here..." style="width:100%;min-height:120px;margin-top:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:5px;font-family:'Lato',sans-serif;font-size:0.87rem;resize:vertical;background:white;line-height:1.5;"></textarea>
+      <button class="btn-check-item" id="chk-${i}" onclick="checkEssayItem(${i})" style="margin-top:0.9rem;">Show Model Answer</button>
       <div class="quiz-explanation" id="exp-${i}" style="margin-top:0.75rem;">
         <strong>📖 Model Answer:</strong>
         <pre style="white-space:pre-wrap;font-family:'Lato',sans-serif;font-size:0.85rem;margin-top:0.4rem;line-height:1.6;">${q.model}</pre>
@@ -1985,6 +2301,101 @@ function buildEssay(container) {
     `;
     container.appendChild(div);
   });
+}
+
+// ── PER-ITEM CHECK FUNCTIONS ──
+function resetItemResult(i, type) {
+  // When user changes selection after already checking, clear badge so they can re-check
+  const badge = document.getElementById(`badge-${i}`);
+  const btn   = document.getElementById(`chk-${i}`);
+  if (!badge || !btn) return;
+  // Only reset if the item hasn't been locked (i.e. global submit not yet run)
+  const inputs = type === 'tf'
+    ? document.querySelectorAll(`input[name="tf${i}"]`)
+    : document.querySelectorAll(`input[name="q${i}"]`);
+  if (inputs.length && !inputs[0].disabled) {
+    badge.style.display = 'none';
+    badge.className = 'item-result-badge';
+    btn.disabled = false;
+    btn.textContent = 'Check Answer';
+    const opts = document.getElementById(`opts-${i}`);
+    if (opts) opts.querySelectorAll('label').forEach(l => l.classList.remove('correct','wrong'));
+    document.getElementById(`exp-${i}`).classList.remove('show');
+  }
+}
+
+function checkMCQItem(idx) {
+  const data = getFilteredMCQ();
+  if (idx >= data.length) return;
+  const q    = data[idx];
+  const sel  = document.querySelector(`input[name="q${idx}"]:checked`);
+  const opts = document.getElementById(`opts-${idx}`).querySelectorAll(`label`);
+  const badge = document.getElementById(`badge-${idx}`);
+  const btn   = document.getElementById(`chk-${idx}`);
+
+  // Reveal correct answer always
+  opts.forEach(l => l.classList.remove('correct','wrong'));
+  opts[q.ans].classList.add('correct');
+
+  let resultClass, resultText;
+  if (!sel) {
+    resultClass = 'skipped'; resultText = '— No answer selected';
+  } else {
+    const val = parseInt(sel.value);
+    if (val === q.ans) { resultClass = 'correct'; resultText = '✓ Correct!'; }
+    else { opts[val].classList.add('wrong'); resultClass = 'wrong'; resultText = '✗ Incorrect'; }
+  }
+
+  badge.className = `item-result-badge ${resultClass}`;
+  badge.textContent = resultText;
+  badge.style.display = 'inline-block';
+  document.getElementById(`exp-${idx}`).classList.add('show');
+  document.querySelectorAll(`input[name="q${idx}"]`).forEach(r => r.disabled = true);
+  btn.disabled = true;
+  btn.textContent = 'Checked';
+}
+
+function checkTFItem(idx) {
+  const data = getFilteredTF();
+  if (idx >= data.length) return;
+  const q    = data[idx];
+  const sel  = document.querySelector(`input[name="tf${idx}"]:checked`);
+  const correct = q.verdict ? 'T' : 'F';
+  const lblT  = document.getElementById(`lbl-${idx}-T`);
+  const lblF  = document.getElementById(`lbl-${idx}-F`);
+  const badge = document.getElementById(`badge-${idx}`);
+  const btn   = document.getElementById(`chk-${idx}`);
+
+  lblT.classList.remove('correct','wrong');
+  lblF.classList.remove('correct','wrong');
+  if (q.verdict) lblT.classList.add('correct'); else lblF.classList.add('correct');
+
+  let resultClass, resultText;
+  if (!sel) {
+    resultClass = 'skipped'; resultText = '— No answer selected';
+  } else if (sel.value === correct) {
+    resultClass = 'correct'; resultText = '✓ Correct!';
+  } else {
+    document.getElementById(`lbl-${idx}-${sel.value}`).classList.add('wrong');
+    resultClass = 'wrong'; resultText = '✗ Incorrect';
+  }
+
+  badge.className = `item-result-badge ${resultClass}`;
+  badge.textContent = resultText;
+  badge.style.display = 'inline-block';
+  document.getElementById(`exp-${idx}`).classList.add('show');
+  document.querySelectorAll(`input[name="tf${idx}"]`).forEach(r => r.disabled = true);
+  btn.disabled = true;
+  btn.textContent = 'Checked';
+}
+
+function checkEssayItem(idx) {
+  const ta  = document.getElementById(`essay-${idx}`);
+  const btn = document.getElementById(`chk-${idx}`);
+  if (ta) ta.style.borderColor = 'var(--gold)';
+  document.getElementById(`exp-${idx}`).classList.add('show');
+  btn.disabled = true;
+  btn.textContent = 'Answer Revealed';
 }
 
 function submitQuiz() {
@@ -1995,26 +2406,41 @@ function submitQuiz() {
 
 function submitMCQ() {
   const data = getFilteredMCQ();
-  let score = 0;
+  let score = 0, answered = 0;
   data.forEach((q, i) => {
-    const sel = document.querySelector(`input[name="q${i}"]:checked`);
+    const btn = document.getElementById(`chk-${i}`);
+    const alreadyChecked = btn && btn.disabled;
+    const sel  = document.querySelector(`input[name="q${i}"]:checked`);
     const opts = document.getElementById(`opts-${i}`).querySelectorAll(`label`);
-    opts.forEach((lbl, j) => { lbl.classList.remove(`correct`,`wrong`); });
+    opts.forEach(lbl => { lbl.classList.remove(`correct`,`wrong`); });
     opts[q.ans].classList.add(`correct`);
     if (sel) {
+      answered++;
       const val = parseInt(sel.value);
       if (val === q.ans) score++;
       else opts[val].classList.add(`wrong`);
     }
     document.getElementById(`exp-${i}`).classList.add(`show`);
     document.querySelectorAll(`input[name="q${i}"]`).forEach(r => r.disabled = true);
+    if (btn) { btn.disabled = true; btn.textContent = 'Checked'; }
+    // Update badge
+    const badge = document.getElementById(`badge-${i}`);
+    if (badge && !alreadyChecked) {
+      if (!sel) { badge.className='item-result-badge skipped'; badge.textContent='— Skipped'; }
+      else if (parseInt(sel.value)===q.ans) { badge.className='item-result-badge correct'; badge.textContent='✓ Correct!'; }
+      else { badge.className='item-result-badge wrong'; badge.textContent='✗ Incorrect'; }
+      badge.style.display='inline-block';
+    }
   });
   showScore(score, data.length);
 }
 
 function submitTF() {
+  const data = getFilteredTF();
   let score = 0;
-  tfData.forEach((q, i) => {
+  data.forEach((q, i) => {
+    const btn = document.getElementById(`chk-${i}`);
+    const alreadyChecked = btn && btn.disabled;
     const sel = document.querySelector(`input[name="tf${i}"]:checked`);
     const correct = q.verdict ? `T` : `F`;
     const lblT = document.getElementById(`lbl-${i}-T`);
@@ -2029,12 +2455,21 @@ function submitTF() {
     }
     document.getElementById(`exp-${i}`).classList.add(`show`);
     document.querySelectorAll(`input[name="tf${i}"]`).forEach(r => r.disabled = true);
+    if (btn) { btn.disabled = true; btn.textContent = 'Checked'; }
+    const badge = document.getElementById(`badge-${i}`);
+    if (badge && !alreadyChecked) {
+      if (!sel) { badge.className='item-result-badge skipped'; badge.textContent='— Skipped'; }
+      else if (sel.value===correct) { badge.className='item-result-badge correct'; badge.textContent='✓ Correct!'; }
+      else { badge.className='item-result-badge wrong'; badge.textContent='✗ Incorrect'; }
+      badge.style.display='inline-block';
+    }
   });
-  showScore(score, tfData.length);
+  showScore(score, data.length);
 }
 
 function revealEssay() {
-  essayData.forEach((_, i) => {
+  const data = getFilteredEssay();
+  data.forEach((_, i) => {
     document.getElementById(`exp-${i}`).classList.add(`show`);
     const ta = document.getElementById(`essay-${i}`);
     if (ta) ta.style.borderColor = `var(--gold)`;
@@ -2063,11 +2498,17 @@ function resetQuiz() {
   document.getElementById(`quiz-score`).style.display = `none`;
   document.getElementById(`quiz-actions`).style.display = `flex`;
   if (currentQuizTab === `mcq`) buildTopicButtons();
+  if (currentQuizTab === `tf`) buildTFTopicButtons();
+  if (currentQuizTab === `essay`) buildEssayTopicButtons();
   buildQuiz();
 }
 
-buildTopicButtons();
-buildQuiz();
+document.addEventListener('DOMContentLoaded', function() {
+  buildTopicButtons();
+  buildTFTopicButtons();
+  buildEssayTopicButtons();
+  buildQuiz();
+});
 
 // ══════════ CASES ══════════
 const casesData = [
